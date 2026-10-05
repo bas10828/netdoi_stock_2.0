@@ -1,0 +1,110 @@
+-- netdoi_stock 2.0 schema
+-- Idempotent: safe to run more than once (npm run db:migrate).
+
+BEGIN;
+
+-- All tables live in the app schema (created by scripts/setup-db.mjs)
+SET LOCAL search_path TO stock;
+
+CREATE TABLE IF NOT EXISTS users (
+  id         SERIAL PRIMARY KEY,
+  username   TEXT NOT NULL UNIQUE,
+  email      TEXT,
+  password   TEXT NOT NULL,            -- bcrypt hash
+  role       TEXT NOT NULL DEFAULT 'user' CHECK (role IN ('admin', 'user')),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- A place we install equipment at (hospital, school, municipality, ...)
+CREATE TABLE IF NOT EXISTS sites (
+  id         SERIAL PRIMARY KEY,
+  name       TEXT NOT NULL,
+  note       TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+-- Same name with different case/spacing is the same site
+CREATE UNIQUE INDEX IF NOT EXISTS sites_name_key ON sites (lower(btrim(name)));
+
+-- One delivered job at a site = one Inventory report
+CREATE TABLE IF NOT EXISTS jobs (
+  id           SERIAL PRIMARY KEY,
+  site_id      INTEGER NOT NULL REFERENCES sites(id) ON DELETE RESTRICT,
+  name         TEXT NOT NULL,          -- e.g. "CCTV", "AP WiFi"
+  delivered_on DATE,
+  po_number    TEXT,                   -- optional, for future use
+  note         TEXT,
+  created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS jobs_site_id_idx ON jobs (site_id);
+
+CREATE TABLE IF NOT EXISTS devices (
+  id                  SERIAL PRIMARY KEY,
+  job_id              INTEGER REFERENCES jobs(id) ON DELETE RESTRICT,
+  device_type         TEXT,
+  brand               TEXT,
+  model               TEXT,
+  serial              TEXT,
+  mac                 TEXT,
+  device_name         TEXT,
+  ip                  TEXT,
+  location            TEXT,
+  note                TEXT,
+  legacy_equipment_id INTEGER UNIQUE,  -- equipment.id in the v1 database, for re-runnable migration
+  created_at          TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+-- Columns added after the first release (CREATE TABLE IF NOT EXISTS skips existing tables)
+ALTER TABLE devices ADD COLUMN IF NOT EXISTS note TEXT;
+
+CREATE INDEX IF NOT EXISTS devices_job_id_idx ON devices (job_id);
+-- Serial/MAC are not unique (old data has duplicates); indexed for search
+CREATE INDEX IF NOT EXISTS devices_serial_idx ON devices (lower(serial));
+CREATE INDEX IF NOT EXISTS devices_mac_idx ON devices (lower(mac));
+
+-- Warranty claims (RMA). Device status is derived from these rows.
+CREATE TABLE IF NOT EXISTS claims (
+  id                    SERIAL PRIMARY KEY,
+  device_id             INTEGER NOT NULL REFERENCES devices(id) ON DELETE RESTRICT,
+  sent_on               DATE NOT NULL,
+  symptom               TEXT,
+  vendor                TEXT,
+  ticket_no             TEXT,
+  returned_on           DATE,          -- NULL = still out
+  result                TEXT CHECK (result IN ('repaired', 'replaced', 'rejected')),
+  replacement_device_id INTEGER REFERENCES devices(id) ON DELETE RESTRICT,
+  note                  TEXT,
+  created_by            TEXT,
+  created_at            TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CHECK (returned_on IS NULL OR returned_on >= sent_on),
+  -- A claim is closed with a result, or open without one
+  CHECK ((returned_on IS NULL) = (result IS NULL)),
+  -- Only a "replaced" result points at a new device, and it must
+  CHECK ((COALESCE(result, '') = 'replaced') = (replacement_device_id IS NOT NULL))
+);
+CREATE INDEX IF NOT EXISTS claims_device_id_idx ON claims (device_id);
+-- At most one open claim per device
+CREATE UNIQUE INDEX IF NOT EXISTS claims_one_open_per_device
+  ON claims (device_id) WHERE returned_on IS NULL;
+
+-- Devices with their job/site and a status derived from claims:
+--   claim    = has an open claim
+--   replaced = a claim returned a new unit in its place
+--   ok       = otherwise
+-- Dropped and recreated so new device columns are picked up.
+DROP VIEW IF EXISTS device_overview;
+CREATE VIEW device_overview AS
+SELECT
+  d.*,
+  j.name         AS job_name,
+  j.delivered_on AS job_delivered_on,
+  j.site_id,
+  s.name         AS site_name,
+  CASE
+    WHEN EXISTS (SELECT 1 FROM claims c WHERE c.device_id = d.id AND c.returned_on IS NULL) THEN 'claim'
+    WHEN EXISTS (SELECT 1 FROM claims c WHERE c.device_id = d.id AND c.result = 'replaced') THEN 'replaced'
+    ELSE 'ok'
+  END AS status
+FROM devices d
+LEFT JOIN jobs j ON j.id = d.job_id
+LEFT JOIN sites s ON s.id = j.site_id;
+
+COMMIT;

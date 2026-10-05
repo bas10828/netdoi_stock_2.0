@@ -3,15 +3,31 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev -H 0.0.0.0 -p 3100",
     "build": "next build",
-    "start": "next start",
-    "lint": "eslint"
+    "start": "next start -H 0.0.0.0 -p 3100",
+    "lint": "eslint",
+    "db:migrate": "node --env-file=.env scripts/migrate.mjs",
+    "db:copy-users": "node --env-file=.env scripts/copy-users.mjs",
+    "db:setup": "node --env-file=.env scripts/setup-db.mjs",
+    "db:export-legacy": "node scripts/export-legacy.mjs",
+    "db:legacy-mapping": "node scripts/legacy-mapping.mjs",
+    "db:migrate-legacy": "node --env-file=.env scripts/migrate-legacy.mjs"
   },
   "dependencies": {
+    "@emotion/cache": "^11.14.0",
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.1",
+    "@mui/icons-material": "^9.4.0",
+    "@mui/material": "^9.4.0",
+    "@mui/material-nextjs": "^9.4.0",
+    "bcryptjs": "^3.0.3",
+    "jose": "^6.2.12",
     "next": "16.3.8",
+    "pg": "^8.23.1",
     "react": "19.2.8",
-    "react-dom": "19.2.8"
+    "react-dom": "19.2.8",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
   },
   "devDependencies": {
     "eslint": "^9",
