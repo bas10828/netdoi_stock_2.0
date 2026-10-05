@@ -1,0 +1,10 @@
+.git
+node_modules
+.next
+.env*
+!.env.example
+certificates
+db/legacy
+public/dev-ca.crt
+public/zxing_reader.wasm
+*.log

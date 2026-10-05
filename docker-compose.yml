@@ -1,0 +1,13 @@
+# netdoi_stock 2.0 on the office server (see DEPLOY.md)
+#   first run / update:  git pull && docker compose up -d --build
+#   schema changes:      docker compose exec app node scripts/migrate.mjs
+services:
+  app:
+    build: .
+    image: netdoi_stock_v2
+    container_name: netdoi_stock_v2
+    restart: unless-stopped
+    env_file: .env
+    ports:
+      # Cloudflare Tunnel points netdoi-stock.22422522.xyz at http://<server>:3100
+      - "3100:3000"
