@@ -15,6 +15,7 @@ import SearchIcon from "@mui/icons-material/Search";
 import PlaceOutlined from "@mui/icons-material/PlaceOutlined";
 import UploadFileOutlined from "@mui/icons-material/UploadFileOutlined";
 import BuildCircleOutlined from "@mui/icons-material/BuildCircleOutlined";
+import DashboardOutlined from "@mui/icons-material/DashboardOutlined";
 import MenuIcon from "@mui/icons-material/Menu";
 import LogoutOutlined from "@mui/icons-material/LogoutOutlined";
 import CommandPalette, { kbdSx } from "./CommandPalette";
@@ -25,6 +26,7 @@ const SIDEBAR_WIDTH = 240;
 
 const NAV = [
   { href: "/", label: "ค้นหา", icon: SearchIcon, match: (p) => p === "/" },
+  { href: "/dashboard", label: "ภาพรวม", icon: DashboardOutlined, match: (p) => p.startsWith("/dashboard") },
   { href: "/sites", label: "สถานที่", icon: PlaceOutlined, match: (p) => /^\/(sites|jobs|devices)/.test(p) },
   { href: "/claims", label: "เคลม", icon: BuildCircleOutlined, match: (p) => p.startsWith("/claims"), badge: "openClaims" },
   { href: "/import", label: "Import Inventory", icon: UploadFileOutlined, match: (p) => p.startsWith("/import") },

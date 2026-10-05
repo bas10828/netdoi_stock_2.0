@@ -2,6 +2,7 @@ import { error, handler, HttpError, json } from "@/lib/api";
 import { transaction } from "@/lib/db";
 import { clean, toId } from "@/lib/format";
 import { LEGACY_JOB_NOTE, recordMoves, snapshotDevices, todayIso } from "@/lib/moves";
+import { canonicalizeField } from "@/lib/catalog";
 
 const DEVICE_FIELDS = ["device_type", "brand", "model", "serial", "mac", "device_name", "ip", "location", "note"];
 const MAX_DEVICES = 5000;
@@ -65,7 +66,7 @@ export const POST = handler(async (request, { user }) => {
     let inserted = 0;
     if (inserts.length > 0) {
       // One array per column for a single INSERT ... SELECT FROM unnest(...)
-      const columns = DEVICE_FIELDS.map((f) => inserts.map((d) => clean(d?.[f])));
+      const columns = DEVICE_FIELDS.map((f) => inserts.map((d) => canonicalizeField(f, clean(d?.[f]))));
       const res = await db.query(
         `INSERT INTO devices (job_id, ${DEVICE_FIELDS.join(", ")})
          SELECT $1, * FROM unnest(${DEVICE_FIELDS.map((_, i) => `$${i + 2}::text[]`).join(", ")})`,
@@ -81,7 +82,7 @@ export const POST = handler(async (request, { user }) => {
       if (previous.length !== mergeIds.length) throw new HttpError("อุปกรณ์เดิมบางตัวถูกลบไปแล้ว ลองโหลดไฟล์ใหม่", 409);
 
       // File values win when present; blanks keep the existing value; notes are appended
-      const columns = DEVICE_FIELDS.map((f) => merges.map((d) => clean(d?.[f])));
+      const columns = DEVICE_FIELDS.map((f) => merges.map((d) => canonicalizeField(f, clean(d?.[f]))));
       await db.query(
         `UPDATE devices d SET
            job_id = $1,

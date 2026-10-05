@@ -2,6 +2,7 @@ import { error, handler, HttpError, json } from "@/lib/api";
 import { transaction } from "@/lib/db";
 import { clean, toId } from "@/lib/format";
 import { ensureJob } from "@/lib/sites";
+import { canonicalBrand, canonicalType } from "@/lib/catalog";
 
 const MAX_ITEMS = 500;
 
@@ -46,7 +47,7 @@ export const POST = handler(async (request, { user }) => {
           await db.query(
             `INSERT INTO devices (job_id, serial, mac, brand, model, device_type, location)
              VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
-            [jobId, serial, clean(item.mac), clean(item.brand), clean(item.model), clean(item.device_type), clean(item.location)]
+            [jobId, serial, clean(item.mac), canonicalBrand(item.brand), clean(item.model), canonicalType(item.device_type), clean(item.location)]
           )
         ).rows[0].id;
       }

@@ -11,6 +11,7 @@ import EditDialog from "@/components/EditDialog";
 import { TextLink } from "@/components/Links";
 import { fontMono } from "@/lib/fonts";
 import DevicesTable from "./DevicesTable";
+import WarrantyDialog from "./WarrantyDialog";
 
 export async function generateMetadata({ params }) {
   const id = toId((await params).id);
@@ -63,6 +64,7 @@ export default async function JobPage({ params }) {
                 { name: "note", label: "หมายเหตุ", type: "multiline" },
               ]}
             />
+            <WarrantyDialog jobId={job.id} deliveredOn={job.delivered_on} deviceCount={job.device_count} />
             <Button variant="outlined" href={`/api/jobs/${job.id}/export`} startIcon={<FileDownloadOutlined />}>
               Export Excel
             </Button>

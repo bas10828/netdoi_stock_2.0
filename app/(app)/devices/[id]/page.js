@@ -3,7 +3,7 @@ import Box from "@mui/material/Box";
 import Card from "@mui/material/Card";
 import Typography from "@mui/material/Typography";
 import { getDevice } from "@/lib/queries";
-import { CLAIM_RESULT, formatDate, toId } from "@/lib/format";
+import { CLAIM_RESULT, formatDate, toId, warrantyText } from "@/lib/format";
 import PageHeader from "@/components/PageHeader";
 import StatusBadge from "@/components/StatusBadge";
 import EditDialog from "@/components/EditDialog";
@@ -75,6 +75,7 @@ export default async function DevicePage({ params }) {
     ["ชื่ออุปกรณ์", device.device_name],
     ["IP", device.ip, true],
     ["ตำแหน่ง", device.location],
+    ["ประกัน", warrantyText(device.warranty_until)],
     ["หมายเหตุ", device.note],
   ];
   const timeline = buildTimeline(device);
@@ -113,7 +114,7 @@ export default async function DevicePage({ params }) {
             title="แก้ไขอุปกรณ์"
             url={`/api/devices/${device.id}`}
             values={Object.fromEntries(
-              ["device_type", "brand", "model", "serial", "mac", "device_name", "ip", "location", "note"].map((k) => [k, device[k] ?? ""])
+              ["device_type", "brand", "model", "serial", "mac", "device_name", "ip", "location", "note", "warranty_until"].map((k) => [k, device[k] ?? ""])
             )}
             fields={[
               { name: "brand", label: "Brand", half: true },
@@ -124,6 +125,7 @@ export default async function DevicePage({ params }) {
               { name: "device_name", label: "ชื่ออุปกรณ์", half: true },
               { name: "ip", label: "IP", type: "mono", half: true },
               { name: "location", label: "ตำแหน่ง", half: true },
+              { name: "warranty_until", label: "ประกันถึงวันที่ (ไม่บังคับ)", type: "date", half: true },
               { name: "note", label: "หมายเหตุ", type: "multiline" },
             ]}
           />
