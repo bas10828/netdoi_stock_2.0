@@ -48,3 +48,6 @@ next-env.d.ts
 /certificates/
 /public/dev-ca.crt
 /public/zxing_reader.wasm
+
+# Local device label photos (not for git)
+/device/

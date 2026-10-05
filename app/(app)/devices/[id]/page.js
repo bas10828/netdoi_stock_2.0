@@ -95,7 +95,7 @@ export default async function DevicePage({ params }) {
         }
         eyebrow={<StatusBadge status={device.status} sx={{ alignSelf: "flex-start" }} />}
         title={title}
-        subtitle={device.job_id ? device.place : "ไม่สังกัดงาน · ใช้ “ย้ายไปงานอื่น” เพื่อใส่เข้างาน"}
+        subtitle={device.job_id ? device.place : "ไม่สังกัดงาน · กด “ระบุสถานที่ติดตั้ง” ถ้ารู้ว่าติดตั้งที่ไหน"}
         actions={
           <>
           {openClaim && (

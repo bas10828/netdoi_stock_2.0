@@ -8,3 +8,4 @@ db/legacy
 public/dev-ca.crt
 public/zxing_reader.wasm
 *.log
+device

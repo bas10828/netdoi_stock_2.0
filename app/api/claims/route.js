@@ -1,12 +1,16 @@
 import { error, handler, HttpError, json } from "@/lib/api";
 import { transaction } from "@/lib/db";
 import { clean, toId } from "@/lib/format";
+import { ensureJob } from "@/lib/sites";
 
 const MAX_ITEMS = 500;
 
 // Send one or more devices for claim, sharing date/vendor/ticket.
 // items: [{ device_id, symptom }] or, for a device not in the system,
-//        [{ serial, mac?, brand?, model?, device_type?, symptom }] which is added without a job
+//        [{ serial, mac?, brand?, model?, device_type?, location?, symptom,
+//           site_id? | site_name?, job_name? }]
+// A new device goes into job_name (default "อุปกรณ์เดิม (ไม่มีรายงาน)") at that site,
+// so we know where it is installed; without a site it is added without a job.
 export const POST = handler(async (request, { user }) => {
   const body = await request.json().catch(() => ({}));
   const sentOn = clean(body.sent_on);
@@ -29,11 +33,20 @@ export const POST = handler(async (request, { user }) => {
           await db.query(`SELECT place FROM device_overview WHERE lower(btrim(serial)) = lower($1) LIMIT 1`, [serial])
         ).rows[0];
         if (dup) throw new HttpError(`serial ${serial} มีอยู่แล้วที่ ${dup.place} · เลือกตัวนั้นแทน`, 409);
+        const jobId =
+          item.site_id || clean(item.site_name)
+            ? await ensureJob(db, {
+                site_id: item.site_id,
+                site_name: item.site_name,
+                job_name: item.job_name,
+                note: "เพิ่มตอนส่งเคลม (ไม่มีรายงาน Inventory)",
+              })
+            : null;
         deviceId = (
           await db.query(
-            `INSERT INTO devices (serial, mac, brand, model, device_type)
-             VALUES ($1, $2, $3, $4, $5) RETURNING id`,
-            [serial, clean(item.mac), clean(item.brand), clean(item.model), clean(item.device_type)]
+            `INSERT INTO devices (job_id, serial, mac, brand, model, device_type, location)
+             VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
+            [jobId, serial, clean(item.mac), clean(item.brand), clean(item.model), clean(item.device_type), clean(item.location)]
           )
         ).rows[0].id;
       }

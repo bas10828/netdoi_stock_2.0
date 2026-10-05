@@ -13,6 +13,67 @@ import ScanButton from "@/components/ScanButton";
 import ScanResult from "@/components/ScanResult";
 import findScanned from "@/components/findScanned";
 import { fontMono } from "@/lib/fonts";
+import PlaceOutlined from "@mui/icons-material/PlaceOutlined";
+import WorkOutlineOutlined from "@mui/icons-material/WorkOutlineOutlined";
+
+const rowSx = {
+  display: "flex",
+  alignItems: "center",
+  gap: 2,
+  px: 2,
+  py: 1.25,
+  borderTop: 1,
+  borderColor: "divider",
+  color: "text.primary",
+  textDecoration: "none",
+  "&:first-of-type": { borderTop: 0 },
+  "&:hover": { bgcolor: "action.hover" },
+};
+
+// Sites and jobs whose name matches, e.g. "เชียงแสนวิท"
+function PlaceResults({ sites, jobs }) {
+  if (sites.length === 0 && jobs.length === 0) return null;
+  return (
+    <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: sites.length && jobs.length ? "repeat(2, minmax(0, 1fr))" : "1fr" }, gap: 1.5 }}>
+      {sites.length > 0 && (
+        <Box>
+          <Typography sx={{ fontSize: 12, fontWeight: 600, color: "text.secondary", mb: 0.5 }}>สถานที่</Typography>
+          <Card>
+            {sites.map((x) => (
+              <Box key={x.id} component={NextLink} href={`/sites/${x.id}`} sx={rowSx}>
+                <PlaceOutlined fontSize="small" sx={{ color: "text.secondary" }} />
+                <Box sx={{ minWidth: 0, flex: 1 }}>
+                  <Typography sx={{ fontWeight: 500 }}>{x.name}</Typography>
+                  <Typography sx={{ fontSize: 12, color: "text.secondary" }}>
+                    {x.job_count} งาน · {x.device_count.toLocaleString("th-TH")} อุปกรณ์
+                  </Typography>
+                </Box>
+              </Box>
+            ))}
+          </Card>
+        </Box>
+      )}
+      {jobs.length > 0 && (
+        <Box>
+          <Typography sx={{ fontSize: 12, fontWeight: 600, color: "text.secondary", mb: 0.5 }}>งาน</Typography>
+          <Card>
+            {jobs.map((j) => (
+              <Box key={j.id} component={NextLink} href={`/jobs/${j.id}`} sx={rowSx}>
+                <WorkOutlineOutlined fontSize="small" sx={{ color: "text.secondary" }} />
+                <Box sx={{ minWidth: 0, flex: 1 }}>
+                  <Typography sx={{ fontWeight: 500 }}>{j.name}</Typography>
+                  <Typography sx={{ fontSize: 12, color: "text.secondary" }}>
+                    {j.site_name} · {j.device_count} อุปกรณ์
+                  </Typography>
+                </Box>
+              </Box>
+            ))}
+          </Card>
+        </Box>
+      )}
+    </Box>
+  );
+}
 
 export default function SearchHome({ stats, initialQuery = "" }) {
   const [q, setQ] = useState(initialQuery);
@@ -35,7 +96,7 @@ export default function SearchHome({ stats, initialQuery = "" }) {
       <Box>
         <Typography variant="h1">ค้นหาอุปกรณ์</Typography>
         <Typography sx={{ color: "text.secondary", mt: 0.5 }}>
-          จาก {stats.devices.toLocaleString("th-TH")} อุปกรณ์ · พิมพ์ serial, MAC หรือรุ่น บางส่วนก็ได้
+          จาก {stats.devices.toLocaleString("th-TH")} อุปกรณ์ · พิมพ์ serial, MAC, รุ่น หรือชื่อสถานที่/งาน บางส่วนก็ได้
         </Typography>
       </Box>
 
@@ -63,7 +124,7 @@ export default function SearchHome({ stats, initialQuery = "" }) {
             setQ(e.target.value);
             setScan(null);
           }}
-          placeholder="พิมพ์ หรือกดสแกน ▸"
+          placeholder="serial, MAC, รุ่น, สถานที่ หรือกดสแกน ▸"
           slotProps={{ input: { "aria-label": "ค้นหา serial, MAC หรือรุ่น" } }}
           sx={{ minHeight: 56, fontSize: 17, fontFamily: fontMono }}
         />
@@ -75,16 +136,21 @@ export default function SearchHome({ stats, initialQuery = "" }) {
 
       {results && !scan && (
         <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
-          <Typography sx={{ fontSize: 13, color: "text.secondary" }}>
-            {results.length === 0
-              ? loading ? "กำลังค้นหา…" : `ไม่พบอุปกรณ์ที่ตรงกับ “${text}”`
-              : results.length >= 50
-                ? "แสดง 50 รายการแรก พิมพ์เพิ่มเพื่อให้แคบลง"
-                : `พบ ${results.length} รายการ`}
+          <PlaceResults sites={results.sites} jobs={results.jobs} />
+          <Typography sx={{ fontSize: 13, color: "text.secondary", mt: results.sites.length || results.jobs.length ? 1 : 0 }}>
+            {results.devices.length === 0
+              ? loading
+                ? "กำลังค้นหา…"
+                : results.sites.length || results.jobs.length
+                  ? `ไม่พบอุปกรณ์ที่ serial/MAC/รุ่น/ตำแหน่งตรงกับ “${text}”`
+                  : `ไม่พบอะไรที่ตรงกับ “${text}”`
+              : results.devices.length >= 50
+                ? "อุปกรณ์ · แสดง 50 รายการแรก พิมพ์เพิ่มเพื่อให้แคบลง"
+                : `อุปกรณ์ · พบ ${results.devices.length} รายการ`}
           </Typography>
-          {results.length > 0 && (
+          {results.devices.length > 0 && (
             <Card>
-              {results.map((d) => (
+              {results.devices.map((d) => (
                 <Box
                   key={d.id}
                   component={NextLink}

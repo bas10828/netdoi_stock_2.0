@@ -7,7 +7,7 @@ import InputBase from "@mui/material/InputBase";
 import Typography from "@mui/material/Typography";
 import CircularProgress from "@mui/material/CircularProgress";
 import SearchIcon from "@mui/icons-material/Search";
-import StatusBadge from "./StatusBadge";
+import StatusBadge, { Pill } from "./StatusBadge";
 import useDeviceSearch from "./useDeviceSearch";
 import ScanButton from "./ScanButton";
 import findScanned from "./findScanned";
@@ -36,11 +36,25 @@ function PaletteBody({ onClose }) {
   const [active, setActive] = useState(0);
   const listRef = useRef(null);
   const { text, results: found, loading } = useDeviceSearch(q, { limit: 8, delay: 150 });
-  const results = found ?? [];
+  // One keyboard-navigable list: sites, then jobs, then devices
+  const results = found
+    ? [
+        ...found.sites.map((x) => ({ key: `s${x.id}`, href: `/sites/${x.id}`, kind: "สถานที่", title: x.name, sub: `${x.job_count} งาน · ${x.device_count} อุปกรณ์` })),
+        ...found.jobs.map((j) => ({ key: `j${j.id}`, href: `/jobs/${j.id}`, kind: "งาน", title: j.name, sub: j.site_name })),
+        ...found.devices.map((d) => ({
+          key: `d${d.id}`,
+          href: `/devices/${d.id}`,
+          title: d.serial || "—",
+          mono: true,
+          sub: `${[d.brand, d.model].filter(Boolean).join(" ")} · ${d.place}`,
+          status: d.status,
+        })),
+      ]
+    : [];
 
-  const go = (device) => {
+  const go = (item) => {
     onClose();
-    router.push(`/devices/${device.id}`);
+    router.push(item.href);
   };
 
   const move = (i) => {
@@ -74,7 +88,7 @@ function PaletteBody({ onClose }) {
             setActive(0);
           }}
           onKeyDown={onKeyDown}
-          placeholder="พิมพ์ serial, MAC หรือรุ่น"
+          placeholder="serial, MAC, รุ่น หรือชื่อสถานที่/งาน"
           slotProps={{ input: { "aria-label": "ค้นหา serial หรือ MAC" } }}
           sx={{ minHeight: 56, fontSize: 16, fontFamily: fontMono }}
         />
@@ -84,7 +98,7 @@ function PaletteBody({ onClose }) {
           onScan={async (value, label) => {
             try {
               const { devices } = await findScanned(value, label);
-              if (devices.length === 1) return go(devices[0]);
+              if (devices.length === 1) return go({ href: `/devices/${devices[0].id}` });
               setQ(devices[0]?.serial || label?.serial || label?.mac || value);
             } catch {
               setQ(label?.serial || value);
@@ -98,7 +112,7 @@ function PaletteBody({ onClose }) {
       <Box ref={listRef} role="listbox" sx={{ maxHeight: 380, overflowY: "auto" }}>
         {results.map((d, i) => (
           <Box
-            key={d.id}
+            key={d.key}
             component="button"
             type="button"
             role="option"
@@ -125,17 +139,15 @@ function PaletteBody({ onClose }) {
             }}
           >
             <Box sx={{ minWidth: 0, flex: 1 }}>
-              <Typography sx={{ fontFamily: fontMono, fontSize: 14, fontWeight: 500 }}>{d.serial || "—"}</Typography>
-              <Typography noWrap sx={{ fontSize: 13, color: "text.secondary" }}>
-                {[d.brand, d.model].filter(Boolean).join(" ")} · {d.place}
-              </Typography>
+              <Typography noWrap sx={{ fontSize: 14, fontWeight: 500, ...(d.mono && { fontFamily: fontMono }) }}>{d.title}</Typography>
+              <Typography noWrap sx={{ fontSize: 13, color: "text.secondary" }}>{d.sub}</Typography>
             </Box>
-            <StatusBadge status={d.status} />
+            {d.status ? <StatusBadge status={d.status} /> : <Pill color="neutral">{d.kind}</Pill>}
           </Box>
         ))}
         {text && !loading && results.length === 0 && (
           <Typography sx={{ p: 3, textAlign: "center", color: "text.secondary" }}>
-            ไม่พบอุปกรณ์ที่ตรงกับ “{text}”
+            ไม่พบอะไรที่ตรงกับ “{text}”
           </Typography>
         )}
         {!text && (

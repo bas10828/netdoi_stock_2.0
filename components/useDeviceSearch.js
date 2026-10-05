@@ -1,8 +1,10 @@
 "use client";
 import { useEffect, useState } from "react";
 
-// Debounced device search. results is null for an empty query; while a new
-// query loads, the previous results stay on screen and loading is true.
+const EMPTY = { devices: [], sites: [], jobs: [] };
+
+// Debounced search. results is null for an empty query, else { devices, sites, jobs };
+// while a new query loads, the previous results stay on screen and loading is true.
 export default function useDeviceSearch(q, { limit = 50, delay = 200 } = {}) {
   const text = q.trim();
   const [state, setState] = useState({ text: "", results: null });
@@ -14,9 +16,9 @@ export default function useDeviceSearch(q, { limit = 50, delay = 200 } = {}) {
       try {
         const res = await fetch(`/api/search?q=${encodeURIComponent(text)}&limit=${limit}`, { signal: ctrl.signal });
         const data = await res.json();
-        setState({ text, results: res.ok ? data.devices : [] });
+        setState({ text, results: res.ok ? { ...EMPTY, ...data } : EMPTY });
       } catch (err) {
-        if (err.name !== "AbortError") setState({ text, results: [] });
+        if (err.name !== "AbortError") setState({ text, results: EMPTY });
       }
     }, delay);
     return () => {

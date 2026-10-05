@@ -20,6 +20,10 @@ import ScanButton from "@/components/ScanButton";
 import StatusBadge, { Pill } from "@/components/StatusBadge";
 import { useToast } from "@/components/Toast";
 import { fontMono } from "@/lib/fonts";
+import SitePicker from "@/components/SitePicker";
+import { BRAND_NAMES, guessBrand, macDigits } from "@/lib/labelParser";
+
+const UNRECORDED_JOB = "อุปกรณ์เดิม (ไม่มีรายงาน)";
 
 const today = () => {
   const d = new Date();
@@ -28,6 +32,25 @@ const today = () => {
 const norm = (s) => String(s ?? "").trim().toLowerCase();
 
 // One item in the batch: a known device, or one that isn't in the system yet
+// "Looks like TP-Link — yes / no", from the S/N format or the MAC vendor prefix
+function BrandGuess({ item, onChange }) {
+  const guess = guessBrand(item.serial, item.mac);
+  if (!guess || item.brand?.trim() || item.guessDismissed === guess) return null;
+  return (
+    <Box sx={{ gridColumn: "1 / -1", display: "flex", flexWrap: "wrap", alignItems: "center", gap: 1, px: 1.25, py: 0.75, borderRadius: 2, bgcolor: "rgba(var(--mui-palette-primary-mainChannel) / 0.08)" }}>
+      <Typography sx={{ fontSize: 13 }}>
+        น่าจะเป็น <strong>{guess}</strong>
+      </Typography>
+      <Button size="small" variant="contained" onClick={() => onChange({ brand: guess })} sx={{ minHeight: 28 }}>
+        ใช่
+      </Button>
+      <Button size="small" onClick={() => onChange({ guessDismissed: guess })} sx={{ minHeight: 28 }}>
+        ไม่ใช่
+      </Button>
+    </Box>
+  );
+}
+
 function ItemRow({ item, onChange, onRemove }) {
   const d = item.device;
   return (
@@ -43,13 +66,38 @@ function ItemRow({ item, onChange, onRemove }) {
           </>
         ) : (
           <>
-            <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 0.75 }}>
+            <Box sx={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 1, mb: 0.75 }}>
               <Typography sx={{ fontFamily: fontMono, fontSize: 13, fontWeight: 500 }}>{item.serial}</Typography>
-              <Pill color="neutral">ไม่มีในระบบ · เพิ่มแบบไม่สังกัดงาน</Pill>
+              <Pill color="neutral">{item.site_name?.trim() ? "ไม่มีในระบบ · จะเพิ่มเข้าสถานที่นี้" : "ไม่มีในระบบ · ไม่สังกัดงาน"}</Pill>
             </Box>
             <Box sx={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 1 }}>
+              <BrandGuess item={item} onChange={onChange} />
               <TextField size="small" label="Brand" value={item.brand} onChange={(e) => onChange({ brand: e.target.value })} />
               <TextField size="small" label="Model" value={item.model} onChange={(e) => onChange({ model: e.target.value })} />
+              <TextField
+                size="small"
+                label="MAC"
+                value={item.mac}
+                onChange={(e) => onChange({ mac: e.target.value })}
+                placeholder="ไม่มีเว้นว่างได้"
+                sx={{ gridColumn: "1 / -1" }}
+                slotProps={{ htmlInput: { style: { fontFamily: fontMono } } }}
+              />
+              <Box sx={{ gridColumn: "1 / -1" }}>
+                <SitePicker
+                  size="small"
+                  label="ติดตั้งที่ (สถานที่)"
+                  value={item.site_name}
+                  onChange={({ site_id, site_name }) => onChange({ site_id, site_name })}
+                  helperText="ไม่บังคับ · ใส่ไว้จะได้รู้ว่าติดตั้งที่ไหน"
+                />
+              </Box>
+              {item.site_name?.trim() && (
+                <>
+                  <TextField size="small" label="ตำแหน่ง" value={item.location} onChange={(e) => onChange({ location: e.target.value })} placeholder="เช่น ตึก 7 ชั้น 2" />
+                  <TextField size="small" label="งาน" value={item.job_name} onChange={(e) => onChange({ job_name: e.target.value })} placeholder={UNRECORDED_JOB} />
+                </>
+              )}
             </Box>
           </>
         )}
@@ -122,9 +170,26 @@ export default function NewClaimForm() {
       else {
         setItems((prev) => {
           if (prev.some((i) => !i.device && norm(i.serial) === norm(value))) return prev;
-          return [...prev, { key: `n${Date.now()}`, device: null, serial: value || label.mac, mac: label?.mac ?? "", brand: label?.brand ?? "", model: label?.model ?? "", symptom: "" }];
+          const last = [...prev].reverse().find((i) => !i.device);
+          return [
+            ...prev,
+            {
+              key: `n${Date.now()}`,
+              device: null,
+              serial: macDigits(value) ?? (value || label.mac),
+              mac: label?.mac || (macDigits(value) ? macDigits(value).match(/.{2}/g).join(":") : ""),
+              brand: BRAND_NAMES[label?.brand] ?? "",
+              model: label?.model ?? "",
+              symptom: "",
+              // Claims sent together usually come from the same place
+              site_id: last?.site_id ?? null,
+              site_name: last?.site_name ?? "",
+              job_name: last?.job_name ?? "",
+              location: "",
+            },
+          ];
         });
-        setNotice({ severity: "info", text: `${value} ไม่มีในระบบ · เพิ่มในรายการแล้ว กรอก Brand/Model ได้` });
+        setNotice({ severity: "info", text: `${value || label.mac} ไม่มีในระบบ · เพิ่มในรายการแล้ว ใส่สถานที่ที่ติดตั้งได้` });
       }
     } catch (err) {
       setNotice({ severity: "error", text: err.message || "ค้นหาไม่สำเร็จ" });
@@ -163,7 +228,12 @@ export default function NewClaimForm() {
         body: JSON.stringify({
           ...form,
           items: items.map((i) =>
-            i.device ? { device_id: i.device.id, symptom: i.symptom } : { serial: i.serial, mac: i.mac, brand: i.brand, model: i.model, symptom: i.symptom }
+            i.device
+              ? { device_id: i.device.id, symptom: i.symptom }
+              : {
+                  serial: i.serial, mac: i.mac, brand: i.brand, model: i.model, symptom: i.symptom,
+                  site_id: i.site_id, site_name: i.site_name, job_name: i.job_name, location: i.location,
+                }
           ),
         }),
       });

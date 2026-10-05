@@ -15,6 +15,11 @@ import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
 import SwapHorizOutlined from "@mui/icons-material/SwapHorizOutlined";
 import { useToast } from "@/components/Toast";
+import SitePicker from "@/components/SitePicker";
+import ToggleButton from "@mui/material/ToggleButton";
+import ToggleButtonGroup from "@mui/material/ToggleButtonGroup";
+
+const UNRECORDED_JOB = "อุปกรณ์เดิม (ไม่มีรายงาน)";
 
 const today = () => {
   const d = new Date();
@@ -51,6 +56,10 @@ export default function MoveDialog({ deviceId, currentJobId, location }) {
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState("");
   const [job, setJob] = useState(null);
+  // "existing": pick a job · "new": a site (+ job name) — for devices from unrecorded projects
+  const [mode, setMode] = useState(currentJobId ? "existing" : "new");
+  const [site, setSite] = useState({ site_id: null, site_name: "" });
+  const [jobName, setJobName] = useState("");
   const [form, setForm] = useState({ location, moved_on: today(), note: "" });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -59,6 +68,9 @@ export default function MoveDialog({ deviceId, currentJobId, location }) {
   const start = () => {
     setJob(null);
     setInput("");
+    setMode(currentJobId ? "existing" : "new");
+    setSite({ site_id: null, site_name: "" });
+    setJobName("");
     setForm({ location, moved_on: today(), note: "" });
     setError("");
     setOpen(true);
@@ -66,8 +78,8 @@ export default function MoveDialog({ deviceId, currentJobId, location }) {
 
   const save = async (e) => {
     e.preventDefault();
-    if (!job) {
-      setError("เลือกงานปลายทาง");
+    if (mode === "existing" ? !job : !site.site_name.trim()) {
+      setError(mode === "existing" ? "เลือกงานปลายทาง" : "เลือกหรือกรอกสถานที่");
       return;
     }
     setSaving(true);
@@ -76,12 +88,14 @@ export default function MoveDialog({ deviceId, currentJobId, location }) {
       const res = await fetch(`/api/devices/${deviceId}/move`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ job_id: job.id, ...form }),
+        body: JSON.stringify(
+          mode === "existing" ? { job_id: job.id, ...form } : { new_job: { ...site, job_name: jobName }, ...form }
+        ),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
       setOpen(false);
-      toast(`ย้ายไป ${job.site_name} · ${job.name} แล้ว`);
+      toast(mode === "existing" ? `ย้ายไป ${job.site_name} · ${job.name} แล้ว` : `ใส่เข้า ${site.site_name.trim()} · ${jobName.trim() || UNRECORDED_JOB} แล้ว`);
       router.refresh();
     } catch (err) {
       setError(err.message || "ย้ายไม่สำเร็จ");
@@ -92,17 +106,34 @@ export default function MoveDialog({ deviceId, currentJobId, location }) {
 
   return (
     <>
-      <Button variant="outlined" startIcon={<SwapHorizOutlined />} onClick={start}>
-        ย้ายไปงานอื่น
+      <Button variant={currentJobId ? "outlined" : "contained"} startIcon={<SwapHorizOutlined />} onClick={start}>
+        {currentJobId ? "ย้ายไปงานอื่น" : "ระบุสถานที่ติดตั้ง"}
       </Button>
       <Dialog open={open} onClose={() => !saving && setOpen(false)} fullWidth maxWidth="sm" fullScreen={phone}>
         <Box component="form" onSubmit={save}>
-          <DialogTitle sx={{ fontWeight: 600 }}>ย้ายอุปกรณ์ไปงานอื่น</DialogTitle>
+          <DialogTitle sx={{ fontWeight: 600 }}>{currentJobId ? "ย้ายอุปกรณ์ไปงานอื่น" : "ระบุสถานที่ติดตั้ง"}</DialogTitle>
           <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, pt: "8px !important" }}>
             <Typography sx={{ fontSize: 13, color: "text.secondary" }}>
               ใช้เมื่อย้ายตัวเดิมไปติดตั้งที่อื่น · งานเดิมจะยังเห็นว่าตัวนี้ย้ายออกไปแล้ว
             </Typography>
             {error && <Alert severity="error">{error}</Alert>}
+            <ToggleButtonGroup
+              exclusive
+              size="small"
+              value={mode}
+              onChange={(_, v) => v && setMode(v)}
+              sx={{ "& .MuiToggleButton-root": { textTransform: "none", px: 1.5, borderColor: "divider" } }}
+            >
+              <ToggleButton value="existing">งานที่มีอยู่</ToggleButton>
+              <ToggleButton value="new">ระบุสถานที่ (งานเก่าที่ไม่มีรายงาน)</ToggleButton>
+            </ToggleButtonGroup>
+            {mode === "new" && (
+              <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "repeat(2, minmax(0, 1fr))" }, gap: 2 }}>
+                <SitePicker label="ติดตั้งที่ (สถานที่)" value={site.site_name} onChange={setSite} required />
+                <TextField label="งาน" value={jobName} onChange={(e) => setJobName(e.target.value)} placeholder={UNRECORDED_JOB} helperText="ชื่อเดิมในสถานที่เดียวกันจะรวมเป็นงานเดียว" />
+              </Box>
+            )}
+            {mode === "existing" && (
             <Autocomplete
               options={jobs}
               loading={loading}
@@ -130,6 +161,7 @@ export default function MoveDialog({ deviceId, currentJobId, location }) {
               }}
               renderInput={(p) => <TextField {...p} label="งานปลายทาง" required placeholder="พิมพ์ชื่องานหรือสถานที่" autoFocus />}
             />
+            )}
             <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "minmax(0, 2fr) minmax(0, 1fr)" }, gap: 2 }}>
               <TextField
                 label="ตำแหน่งใหม่"
@@ -159,7 +191,7 @@ export default function MoveDialog({ deviceId, currentJobId, location }) {
             <Button onClick={() => setOpen(false)} disabled={saving} variant="outlined">
               ยกเลิก
             </Button>
-            <Button type="submit" variant="contained" disabled={saving || !job}>
+            <Button type="submit" variant="contained" disabled={saving || (mode === "existing" ? !job : !site.site_name.trim())}>
               {saving ? "กำลังย้าย…" : "ย้าย"}
             </Button>
           </DialogActions>
