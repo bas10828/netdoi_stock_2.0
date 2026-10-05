@@ -85,6 +85,27 @@ CREATE INDEX IF NOT EXISTS claims_device_id_idx ON claims (device_id);
 CREATE UNIQUE INDEX IF NOT EXISTS claims_one_open_per_device
   ON claims (device_id) WHERE returned_on IS NULL;
 
+-- A device relocated from one job to another (e.g. a customer's existing AP
+-- moved to another building in a new project). The device row holds where it
+-- is now; this keeps where it was. Labels are snapshots so history survives
+-- jobs being renamed or deleted.
+CREATE TABLE IF NOT EXISTS device_moves (
+  id            SERIAL PRIMARY KEY,
+  device_id     INTEGER NOT NULL REFERENCES devices(id) ON DELETE CASCADE,
+  from_job_id   INTEGER REFERENCES jobs(id) ON DELETE SET NULL,
+  to_job_id     INTEGER REFERENCES jobs(id) ON DELETE SET NULL,
+  from_label    TEXT NOT NULL,         -- "site · job" at the time of the move
+  to_label      TEXT NOT NULL,
+  from_location TEXT,
+  to_location   TEXT,
+  moved_on      DATE NOT NULL,
+  note          TEXT,
+  created_by    TEXT,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS device_moves_device_id_idx ON device_moves (device_id);
+CREATE INDEX IF NOT EXISTS device_moves_from_job_id_idx ON device_moves (from_job_id);
+
 -- Devices with their job/site and a status derived from claims:
 --   claim    = has an open claim
 --   replaced = a claim returned a new unit in its place

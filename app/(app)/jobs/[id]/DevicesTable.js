@@ -22,6 +22,8 @@ import { STATUS, searchKey } from "@/lib/format";
 import { fontMono } from "@/lib/fonts";
 
 const mono = { fontFamily: fontMono, fontSize: 13 };
+// Notes can be several lines (e.g. merged v1 comments); keep line breaks
+const noteSx = { fontSize: 13, whiteSpace: "pre-line", overflowWrap: "anywhere" };
 
 export default function DevicesTable({ devices }) {
   const [filter, setFilter] = useState("");
@@ -43,7 +45,7 @@ export default function DevicesTable({ devices }) {
       if (!text) return true;
       return (
         (key && (searchKey(d.serial).includes(key) || searchKey(d.mac).includes(key))) ||
-        [d.brand, d.model, d.device_type, d.device_name, d.location, d.ip].some((v) => v?.toLowerCase().includes(text))
+        [d.brand, d.model, d.device_type, d.device_name, d.location, d.ip, d.note].some((v) => v?.toLowerCase().includes(text))
       );
     });
   }, [devices, filter, status]);
@@ -115,6 +117,7 @@ export default function DevicesTable({ devices }) {
             <Typography sx={{ fontSize: 13, color: "text.secondary" }}>
               {[d.device_type, d.device_name, d.location].filter(Boolean).join(" · ")}
             </Typography>
+            {d.note && <Typography sx={{ ...noteSx, mt: 0.25 }}>{d.note}</Typography>}
           </Box>
         ))}
         {pageRows.length === 0 && (
@@ -124,13 +127,14 @@ export default function DevicesTable({ devices }) {
 
       <Card sx={{ display: { xs: shown.length > 25 ? "block" : "none", sm: "block" }, "& .MuiTableContainer-root": { display: { xs: "none", sm: "block" } } }}>
         <TableContainer>
-          <Table sx={{ minWidth: 820 }}>
+          <Table sx={{ minWidth: 1000 }}>
             <TableHead>
               <TableRow>
                 <TableCell>อุปกรณ์</TableCell>
                 <TableCell>Serial</TableCell>
                 <TableCell>MAC</TableCell>
                 <TableCell>ตำแหน่ง</TableCell>
+                <TableCell>หมายเหตุ</TableCell>
                 <TableCell>สถานะ</TableCell>
               </TableRow>
             </TableHead>
@@ -155,6 +159,9 @@ export default function DevicesTable({ devices }) {
                     {d.location || "—"}
                     {d.ip && <Typography sx={{ ...mono, fontSize: 12, color: "text.secondary" }}>{d.ip}</Typography>}
                   </TableCell>
+                  <TableCell sx={{ maxWidth: 240 }}>
+                    {d.note ? <Typography sx={noteSx}>{d.note}</Typography> : <Typography sx={{ color: "text.secondary" }}>—</Typography>}
+                  </TableCell>
                   <TableCell>
                     <StatusBadge status={d.status} />
                   </TableCell>
@@ -162,7 +169,7 @@ export default function DevicesTable({ devices }) {
               ))}
               {pageRows.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={5} sx={{ textAlign: "center", color: "text.secondary", py: 5 }}>
+                  <TableCell colSpan={6} sx={{ textAlign: "center", color: "text.secondary", py: 5 }}>
                     ไม่พบอุปกรณ์ที่ตรงกับตัวกรอง
                   </TableCell>
                 </TableRow>

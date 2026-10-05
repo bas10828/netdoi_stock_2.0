@@ -48,6 +48,7 @@ const COLUMNS = [
   { field: "serial", label: "Serial", width: 170, mono: true },
   { field: "mac", label: "MAC", width: 160, mono: true },
   { field: "location", label: "ตำแหน่ง", width: 200, multiline: true },
+  { field: "note", label: "หมายเหตุ", width: 200, multiline: true },
 ];
 
 // What to do with a row whose serial already exists
@@ -388,6 +389,7 @@ export default function ImportForm() {
       toast(
         `บันทึกเข้า “${jobName.trim()}” แล้ว · เพิ่มใหม่ ${data.inserted}` +
           (data.merged ? ` · ย้ายและอัปเดต ${data.merged}` : "") +
+          (data.moved ? ` (ย้ายจากงานอื่น ${data.moved} จดประวัติไว้แล้ว)` : "") +
           (data.removed_jobs ? ` · ลบงานเดิมที่ว่าง ${data.removed_jobs}` : "")
       );
       router.push(`/jobs/${data.job_id}`);
@@ -558,7 +560,7 @@ export default function ImportForm() {
 
             <Card sx={{ display: { xs: visible.length > 25 ? "block" : "none", md: "block" }, "& .MuiTableContainer-root": { display: { xs: "none", md: "block" } } }}>
               <TableContainer sx={{ maxHeight: "65vh" }}>
-                <Table stickyHeader size="small" sx={{ tableLayout: "fixed", minWidth: 1180 }}>
+                <Table stickyHeader size="small" sx={{ tableLayout: "fixed", minWidth: 1380 }}>
                   <TableHead>
                     <TableRow>
                       <TableCell sx={{ width: 44 }}>#</TableCell>
@@ -596,7 +598,7 @@ export default function ImportForm() {
             </Card>
 
             <Typography sx={{ fontSize: 12, color: "text.secondary" }}>
-              แก้ข้อมูลในตารางได้เลย · ชื่ออุปกรณ์, IP และ Remark จากไฟล์ถูกบันทึกด้วย
+              แก้ข้อมูลในตารางได้เลย · หมายเหตุมาจากคอลัมน์ Remark ในไฟล์ · ชื่ออุปกรณ์และ IP จากไฟล์ถูกบันทึกด้วย
             </Typography>
 
             <Box sx={{ display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "flex-end", gap: 1.5, mt: 1 }}>

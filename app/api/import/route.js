@@ -1,16 +1,16 @@
 import { error, handler, json } from "@/lib/api";
 import { transaction } from "@/lib/db";
 import { clean, toId } from "@/lib/format";
+import { LEGACY_JOB_NOTE, recordMoves, snapshotDevices, todayIso } from "@/lib/moves";
 
 const DEVICE_FIELDS = ["device_type", "brand", "model", "serial", "mac", "device_name", "ip", "location", "note"];
 const MAX_DEVICES = 5000;
-// Jobs created by scripts/migrate-legacy.mjs; removed here once a merge empties them
-const LEGACY_JOB_NOTE = "นำเข้าจากระบบเดิม";
 
 // Creates (or reuses) the site and creates the job, then for each device either
-// inserts it, or (with merge_device_id) moves that existing device into the job
-// and fills in the file's values. One transaction: on any error nothing is saved.
-export const POST = handler(async (request) => {
+// inserts it, or (with merge_device_id) moves that existing device into the job,
+// fills in the file's values and records the move. One transaction: on any error
+// nothing is saved.
+export const POST = handler(async (request, { user }) => {
   const body = await request.json().catch(() => ({}));
   const siteId = body.site_id ? toId(body.site_id) : null;
   const siteName = clean(body.site_name);
@@ -70,11 +70,9 @@ export const POST = handler(async (request) => {
     }
 
     let removedJobs = 0;
+    let moved = 0;
     if (merges.length > 0) {
-      const { rows: previous } = await db.query(
-        `SELECT id, job_id FROM devices WHERE id = ANY($1::int[]) FOR UPDATE`,
-        [mergeIds]
-      );
+      const previous = await snapshotDevices(db, mergeIds);
       if (previous.length !== mergeIds.length) return { error: "อุปกรณ์เดิมบางตัวถูกลบไปแล้ว ลองโหลดไฟล์ใหม่", status: 409 };
 
       // File values win when present; blanks keep the existing value; notes are appended
@@ -94,6 +92,14 @@ export const POST = handler(async (request) => {
         [job.id, mergeIds, ...columns]
       );
 
+      // History for devices that came from another real job (not legacy cleanup)
+      moved = await recordMoves(db, previous, {
+        toJobId: job.id,
+        movedOn: deliveredOn ?? todayIso(),
+        note: `ย้ายตอน Import งาน “${jobName}”`,
+        createdBy: user.username,
+      });
+
       // Legacy-migrated jobs left without devices are just noise now
       const oldJobIds = [...new Set(previous.map((p) => p.job_id).filter(Boolean))];
       const removed = await db.query(
@@ -112,7 +118,7 @@ export const POST = handler(async (request) => {
       );
     }
 
-    return { site_id: site.id, job_id: job.id, inserted, merged: merges.length, removed_jobs: removedJobs };
+    return { site_id: site.id, job_id: job.id, inserted, merged: merges.length, moved, removed_jobs: removedJobs };
   });
 
   if (result.error) return error(result.error, result.status);

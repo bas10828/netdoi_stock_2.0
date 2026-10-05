@@ -7,6 +7,7 @@ import { CLAIM_RESULT, formatDate, toId } from "@/lib/format";
 import PageHeader from "@/components/PageHeader";
 import StatusBadge from "@/components/StatusBadge";
 import EditDialog from "@/components/EditDialog";
+import MoveDialog from "./MoveDialog";
 import { TextLink } from "@/components/Links";
 import { fontMono } from "@/lib/fonts";
 
@@ -16,16 +17,28 @@ export async function generateMetadata({ params }) {
   return { title: device ? device.serial || device.model || "อุปกรณ์" : "ไม่พบอุปกรณ์" };
 }
 
-// Install + claim events for the history timeline, oldest first
+// Install, move and claim events for the history timeline, oldest first
 function buildTimeline(device) {
+  // After a move the original install is the first move's source job
+  const first = device.moves[0];
   const events = [
-    { key: "install", date: device.job_delivered_on, tone: "success", title: "ติดตั้ง", detail: `${device.job_name} · ${device.site_name}` },
+    first
+      ? { key: "install", date: first.from_delivered_on, tone: "success", title: "ติดตั้ง", detail: first.from_label, sortFirst: true }
+      : { key: "install", date: device.job_delivered_on, tone: "success", title: "ติดตั้ง", detail: `${device.site_name} · ${device.job_name}` },
   ];
+  for (const m of device.moves) {
+    const where = m.from_location !== m.to_location ? `ตำแหน่ง: ${m.from_location || "—"} → ${m.to_location || "—"}` : null;
+    events.push({
+      key: `move-${m.id}`, date: m.moved_on, tone: "primary", title: `ย้ายไป ${m.to_label}`,
+      detail: [where, m.note, m.created_by && `โดย ${m.created_by}`].filter(Boolean).join("\n"),
+      link: m.from_job_id && { href: `/jobs/${m.from_job_id}`, label: `จากงาน ${m.from_label}` },
+    });
+  }
   for (const c of device.claims) {
     if (c.replacement_device_id === device.id) {
       events.push({
         key: `in-${c.id}`, date: c.returned_on, tone: "success", title: "มาแทนตัวที่ส่งเคลม",
-        detail: c.symptom, link: { href: `/devices/${c.device_id}`, label: `ตัวเก่า ${c.old_serial ?? ""}` },
+        detail: c.symptom, link: { href: `/devices/${c.device_id}`, label: `ตัวเก่า ${c.old_serial ?? ""}`, mono: true },
       });
       continue;
     }
@@ -37,11 +50,11 @@ function buildTimeline(device) {
       events.push({
         key: `ret-${c.id}`, date: c.returned_on, tone: c.result === "replaced" ? "neutral" : "success",
         title: `รับคืน: ${CLAIM_RESULT[c.result]}`, detail: c.note,
-        link: c.replacement_device_id && { href: `/devices/${c.replacement_device_id}`, label: `ตัวใหม่ ${c.replacement_serial ?? ""}` },
+        link: c.replacement_device_id && { href: `/devices/${c.replacement_device_id}`, label: `ตัวใหม่ ${c.replacement_serial ?? ""}`, mono: true },
       });
     }
   }
-  return events.sort((a, b) => String(a.date ?? "").localeCompare(String(b.date ?? "")));
+  return events.sort((a, b) => (b.sortFirst ? 1 : 0) - (a.sortFirst ? 1 : 0) || String(a.date ?? "").localeCompare(String(b.date ?? "")));
 }
 
 export default async function DevicePage({ params }) {
@@ -74,6 +87,8 @@ export default async function DevicePage({ params }) {
         title={title}
         subtitle={`${device.site_name} · ${device.job_name}`}
         actions={
+          <>
+          <MoveDialog deviceId={device.id} currentJobId={device.job_id} location={device.location ?? ""} />
           <EditDialog
             title="แก้ไขอุปกรณ์"
             url={`/api/devices/${device.id}`}
@@ -92,6 +107,7 @@ export default async function DevicePage({ params }) {
               { name: "note", label: "หมายเหตุ", type: "multiline" },
             ]}
           />
+          </>
         }
       />
 
@@ -100,7 +116,7 @@ export default async function DevicePage({ params }) {
           {fields.map(([label, value, isMono]) => (
             <Box key={label} sx={{ display: "flex", gap: 2, py: 1.4, borderTop: 1, borderColor: "divider", "&:first-of-type": { borderTop: 0 } }}>
               <Typography sx={{ width: 110, flex: "none", color: "text.secondary" }}>{label}</Typography>
-              <Typography sx={{ minWidth: 0, overflowWrap: "anywhere", ...(isMono && value ? { fontFamily: fontMono, fontSize: 13.5 } : {}), color: value ? "text.primary" : "text.secondary" }}>
+              <Typography sx={{ minWidth: 0, overflowWrap: "anywhere", whiteSpace: "pre-line", ...(isMono && value ? { fontFamily: fontMono, fontSize: 13.5 } : {}), color: value ? "text.primary" : "text.secondary" }}>
                 {value || "—"}
               </Typography>
             </Box>
@@ -119,9 +135,9 @@ export default async function DevicePage({ params }) {
                 <Box sx={{ minWidth: 0 }}>
                   <Typography sx={{ fontWeight: 500 }}>{e.title}</Typography>
                   <Typography sx={{ fontSize: 13, color: "text.secondary" }}>{formatDate(e.date)}</Typography>
-                  {e.detail && <Typography sx={{ fontSize: 13, mt: 0.25 }}>{e.detail}</Typography>}
+                  {e.detail && <Typography sx={{ fontSize: 13, mt: 0.25, whiteSpace: "pre-line" }}>{e.detail}</Typography>}
                   {e.link && (
-                    <TextLink href={e.link.href} sx={{ fontFamily: fontMono, fontSize: 13 }}>
+                    <TextLink href={e.link.href} sx={{ fontSize: 13, ...(e.link.mono && { fontFamily: fontMono }) }}>
                       {e.link.label}
                     </TextLink>
                   )}
