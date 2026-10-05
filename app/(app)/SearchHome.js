@@ -9,10 +9,11 @@ import LinearProgress from "@mui/material/LinearProgress";
 import SearchIcon from "@mui/icons-material/Search";
 import StatusBadge from "@/components/StatusBadge";
 import useDeviceSearch from "@/components/useDeviceSearch";
+import ScanButton from "@/components/ScanButton";
 import { fontMono } from "@/lib/fonts";
 
-export default function SearchHome({ stats }) {
-  const [q, setQ] = useState("");
+export default function SearchHome({ stats, initialQuery = "" }) {
+  const [q, setQ] = useState(initialQuery);
   const { text, results, loading } = useDeviceSearch(q);
   return (
     <Box sx={{ display: "flex", flexDirection: "column", gap: 2.5 }}>
@@ -48,6 +49,7 @@ export default function SearchHome({ stats }) {
           slotProps={{ input: { "aria-label": "ค้นหา serial, MAC หรือรุ่น" } }}
           sx={{ minHeight: 56, fontSize: 17, fontFamily: fontMono }}
         />
+        <ScanButton onScan={setQ} />
         {loading && <LinearProgress sx={{ position: "absolute", left: 0, right: 0, bottom: 0, height: 2 }} />}
       </Box>
 
@@ -86,7 +88,7 @@ export default function SearchHome({ stats }) {
                       {[d.brand, d.model].filter(Boolean).join(" ") || d.device_type || "อุปกรณ์"}
                     </Typography>
                     <Typography noWrap sx={{ fontSize: 13, color: "text.secondary" }}>
-                      {[d.site_name, d.job_name, d.location].filter(Boolean).join(" · ")}
+                      {[d.place, d.location, d.shared_count > 0 && `ใช้ร่วมกับอีก ${d.shared_count} งาน`].filter(Boolean).join(" · ")}
                     </Typography>
                   </Box>
                   <Box sx={{ display: { xs: "none", sm: "flex" }, flexDirection: "column", alignItems: "flex-end" }}>

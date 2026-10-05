@@ -17,7 +17,7 @@ import ToggleButtonGroup from "@mui/material/ToggleButtonGroup";
 import Typography from "@mui/material/Typography";
 import InputAdornment from "@mui/material/InputAdornment";
 import FilterListIcon from "@mui/icons-material/FilterList";
-import StatusBadge from "@/components/StatusBadge";
+import StatusBadge, { Pill } from "@/components/StatusBadge";
 import { STATUS, searchKey } from "@/lib/format";
 import { fontMono } from "@/lib/fonts";
 
@@ -118,6 +118,7 @@ export default function DevicesTable({ devices }) {
               {[d.device_type, d.device_name, d.location].filter(Boolean).join(" · ")}
             </Typography>
             {d.note && <Typography sx={{ ...noteSx, mt: 0.25 }}>{d.note}</Typography>}
+            {d.shared_count > 0 && <Pill color="primary" sx={{ alignSelf: "flex-start" }}>ใช้ร่วมกับอีก {d.shared_count} งาน</Pill>}
           </Box>
         ))}
         {pageRows.length === 0 && (
@@ -148,6 +149,9 @@ export default function DevicesTable({ devices }) {
                     <Typography sx={{ fontSize: 12, color: "text.secondary" }}>
                       {[d.device_type, d.device_name].filter(Boolean).join(" · ")}
                     </Typography>
+                    {d.shared_count > 0 && (
+                      <Pill color="primary" sx={{ mt: 0.5 }}>ใช้ร่วมกับอีก {d.shared_count} งาน</Pill>
+                    )}
                   </TableCell>
                   <TableCell>
                     <Link component={NextLink} href={`/devices/${d.id}`} sx={mono}>

@@ -15,8 +15,13 @@ import EditOutlined from "@mui/icons-material/EditOutlined";
 import { useToast } from "./Toast";
 import { fontMono } from "@/lib/fonts";
 
+// Long single-line values (job/site names): the box grows to show the whole text,
+// but Enter and pasted line breaks don't create new lines.
+export const oneLine = (value) => value.replace(/\s*\n\s*/g, " ");
+const blockEnter = (e) => e.key === "Enter" && e.preventDefault();
+
 // Button + dialog that PATCHes `url` with the edited fields, then refreshes the page.
-// fields: [{ name, label, type?: "text"|"date"|"mono"|"multiline", required?, half? }]
+// fields: [{ name, label, type?: "text"|"long"|"date"|"mono"|"multiline", required?, half? }]
 export default function EditDialog({ title, url, fields, values, buttonLabel = "แก้ไข" }) {
   const router = useRouter();
   const toast = useToast();
@@ -69,11 +74,15 @@ export default function EditDialog({ title, url, fields, values, buttonLabel = "
                 key={f.name}
                 label={f.label}
                 value={form[f.name] ?? ""}
-                onChange={(e) => setForm((prev) => ({ ...prev, [f.name]: e.target.value }))}
+                onChange={(e) =>
+                  setForm((prev) => ({ ...prev, [f.name]: f.type === "long" ? oneLine(e.target.value) : e.target.value }))
+                }
+                onKeyDown={f.type === "long" ? blockEnter : undefined}
                 required={f.required}
                 type={f.type === "date" ? "date" : "text"}
-                multiline={f.type === "multiline"}
+                multiline={f.type === "multiline" || f.type === "long"}
                 minRows={f.type === "multiline" ? 2 : undefined}
+                maxRows={f.type === "long" ? 5 : undefined}
                 fullWidth
                 sx={{ gridColumn: { xs: "1 / -1", sm: f.half ? "auto" : "1 / -1" } }}
                 slotProps={{

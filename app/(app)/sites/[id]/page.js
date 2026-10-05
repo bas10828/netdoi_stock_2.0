@@ -34,7 +34,7 @@ export default async function SitePage({ params }) {
               url={`/api/sites/${site.id}`}
               values={{ name: site.name, note: site.note ?? "" }}
               fields={[
-                { name: "name", label: "ชื่อสถานที่", required: true },
+                { name: "name", label: "ชื่อสถานที่", type: "long", required: true },
                 { name: "note", label: "หมายเหตุ", type: "multiline" },
               ]}
             />

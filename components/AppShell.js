@@ -14,16 +14,19 @@ import Typography from "@mui/material/Typography";
 import SearchIcon from "@mui/icons-material/Search";
 import PlaceOutlined from "@mui/icons-material/PlaceOutlined";
 import UploadFileOutlined from "@mui/icons-material/UploadFileOutlined";
+import BuildCircleOutlined from "@mui/icons-material/BuildCircleOutlined";
 import MenuIcon from "@mui/icons-material/Menu";
 import LogoutOutlined from "@mui/icons-material/LogoutOutlined";
 import CommandPalette, { kbdSx } from "./CommandPalette";
 import ThemeToggle from "./ThemeToggle";
+import ScanButton from "./ScanButton";
 
 const SIDEBAR_WIDTH = 240;
 
 const NAV = [
   { href: "/", label: "ค้นหา", icon: SearchIcon, match: (p) => p === "/" },
   { href: "/sites", label: "สถานที่", icon: PlaceOutlined, match: (p) => /^\/(sites|jobs|devices)/.test(p) },
+  { href: "/claims", label: "เคลม", icon: BuildCircleOutlined, match: (p) => p.startsWith("/claims"), badge: "openClaims" },
   { href: "/import", label: "Import Inventory", icon: UploadFileOutlined, match: (p) => p.startsWith("/import") },
 ];
 
@@ -53,14 +56,14 @@ function Logo() {
   );
 }
 
-function SidebarContent({ pathname, onNavigate }) {
+function SidebarContent({ pathname, onNavigate, counts }) {
   return (
     <Box sx={{ display: "flex", flexDirection: "column", gap: 3, p: 1.5, pt: 2.25, height: "100%" }}>
       <Box sx={{ px: 0.75 }}>
         <Logo />
       </Box>
       <Box component="nav" aria-label="เมนูหลัก" sx={{ display: "flex", flexDirection: "column", gap: 0.25 }}>
-        {NAV.map(({ href, label, icon: Icon, match }) => {
+        {NAV.map(({ href, label, icon: Icon, match, badge }) => {
           const on = match(pathname);
           return (
             <Box
@@ -85,6 +88,25 @@ function SidebarContent({ pathname, onNavigate }) {
             >
               <Icon fontSize="small" />
               {label}
+              {badge && counts?.[badge] > 0 && (
+                <Box
+                  component="span"
+                  aria-label={`ค้าง ${counts[badge]} รายการ`}
+                  sx={{
+                    ml: "auto",
+                    minWidth: 22,
+                    px: 0.75,
+                    borderRadius: 999,
+                    fontSize: 12,
+                    fontWeight: 600,
+                    textAlign: "center",
+                    color: "warning.main",
+                    bgcolor: "rgba(var(--mui-palette-warning-mainChannel) / 0.14)",
+                  }}
+                >
+                  {counts[badge]}
+                </Box>
+              )}
             </Box>
           );
         })}
@@ -93,7 +115,8 @@ function SidebarContent({ pathname, onNavigate }) {
   );
 }
 
-export default function AppShell({ user, children }) {
+export default function AppShell({ user, openClaims = 0, children }) {
+  const counts = { openClaims };
   const pathname = usePathname();
   const router = useRouter();
   const [paletteOpen, setPaletteOpen] = useState(false);
@@ -115,6 +138,18 @@ export default function AppShell({ user, children }) {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
+
+  // Scan anywhere: one exact match opens the device, otherwise search for it
+  const onScan = async (code) => {
+    try {
+      const res = await fetch(`/api/devices/lookup?serial=${encodeURIComponent(code)}`);
+      const { devices = [] } = await res.json();
+      if (res.ok && devices.length === 1) return router.push(`/devices/${devices[0].id}`);
+    } catch {
+      // fall through to the search page
+    }
+    router.push(`/?q=${encodeURIComponent(code)}`);
+  };
 
   const logout = async () => {
     setUserMenu(null);
@@ -140,7 +175,7 @@ export default function AppShell({ user, children }) {
           height: "100vh",
         }}
       >
-        <SidebarContent pathname={pathname} />
+        <SidebarContent pathname={pathname} counts={counts} />
       </Box>
 
       {/* Mobile sidebar */}
@@ -150,7 +185,7 @@ export default function AppShell({ user, children }) {
         sx={{ display: { md: "none" } }}
         slotProps={{ paper: { sx: { width: SIDEBAR_WIDTH } } }}
       >
-        <SidebarContent pathname={pathname} onNavigate={() => setDrawerOpen(false)} />
+        <SidebarContent pathname={pathname} counts={counts} onNavigate={() => setDrawerOpen(false)} />
       </Drawer>
 
       <Box sx={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
@@ -196,6 +231,7 @@ export default function AppShell({ user, children }) {
               Ctrl K
             </Box>
           </Button>
+          <ScanButton onScan={onScan} edge={false} />
           <ThemeToggle />
           <IconButton aria-label="บัญชีผู้ใช้" onClick={(e) => setUserMenu(e.currentTarget)} sx={{ p: 0.5 }}>
             <Avatar sx={{ width: 32, height: 32, fontSize: 14, fontWeight: 600, bgcolor: "rgba(var(--mui-palette-primary-mainChannel) / 0.14)", color: "primary.main" }}>

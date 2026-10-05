@@ -11,7 +11,8 @@ import SearchHome from "./SearchHome";
 
 export const metadata = { title: "ค้นหา" };
 
-export default async function HomePage() {
+export default async function HomePage({ searchParams }) {
+  const q = String((await searchParams).q ?? "");
   const [stats, recentJobs] = await Promise.all([getStats(), getRecentJobs(6)]);
 
   if (stats.devices === 0) {
@@ -29,7 +30,7 @@ export default async function HomePage() {
 
   return (
     <Box sx={{ display: "flex", flexDirection: "column", gap: 4 }}>
-      <SearchHome stats={stats} />
+      <SearchHome stats={stats} initialQuery={q} key={q} />
 
       <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "repeat(2, minmax(0, 1fr))" }, gap: 2 }}>
         <Card sx={{ p: 2.25 }}>

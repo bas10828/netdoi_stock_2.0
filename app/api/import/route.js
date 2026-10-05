@@ -1,4 +1,4 @@
-import { error, handler, json } from "@/lib/api";
+import { error, handler, HttpError, json } from "@/lib/api";
 import { transaction } from "@/lib/db";
 import { clean, toId } from "@/lib/format";
 import { LEGACY_JOB_NOTE, recordMoves, snapshotDevices, todayIso } from "@/lib/moves";
@@ -24,19 +24,24 @@ export const POST = handler(async (request, { user }) => {
   if (devices.length === 0) return error("ไม่มีอุปกรณ์ให้บันทึก");
   if (devices.length > MAX_DEVICES) return error(`บันทึกได้ครั้งละไม่เกิน ${MAX_DEVICES} รายการ`);
 
+  // merge_device_id: move that device here; ref_device_id: it stays put but is listed in this job
   const merges = devices.filter((d) => d?.merge_device_id);
-  const inserts = devices.filter((d) => !d?.merge_device_id);
+  const refIds = [...new Set(devices.filter((d) => d?.ref_device_id).map((d) => toId(d.ref_device_id)))];
+  const inserts = devices.filter((d) => !d?.merge_device_id && !d?.ref_device_id);
   const mergeIds = merges.map((d) => toId(d.merge_device_id));
-  if (mergeIds.some((id) => !id)) return error("รหัสอุปกรณ์ที่จะย้ายไม่ถูกต้อง");
+  if (mergeIds.some((id) => !id) || refIds.some((id) => !id)) return error("รหัสอุปกรณ์เดิมไม่ถูกต้อง");
   if (new Set(mergeIds).size !== mergeIds.length) {
     return error("มีหลายแถวเลือกย้ายอุปกรณ์ตัวเดียวกัน (serial ซ้ำในไฟล์) ลบหรือเปลี่ยนแถวที่ซ้ำก่อน");
+  }
+  if (refIds.some((id) => mergeIds.includes(id))) {
+    return error("อุปกรณ์ตัวเดียวกันถูกเลือกทั้ง “ย้าย” และ “อยู่ที่เดิม” (serial ซ้ำในไฟล์)");
   }
 
   const result = await transaction(async (db) => {
     let site;
     if (siteId) {
       [site] = (await db.query(`SELECT id FROM sites WHERE id = $1`, [siteId])).rows;
-      if (!site) return { error: "ไม่พบสถานที่ที่เลือก", status: 404 };
+      if (!site) throw new HttpError("ไม่พบสถานที่ที่เลือก", 404);
     } else {
       // Same name (ignoring case/spaces) reuses the existing site
       [site] = (
@@ -73,7 +78,7 @@ export const POST = handler(async (request, { user }) => {
     let moved = 0;
     if (merges.length > 0) {
       const previous = await snapshotDevices(db, mergeIds);
-      if (previous.length !== mergeIds.length) return { error: "อุปกรณ์เดิมบางตัวถูกลบไปแล้ว ลองโหลดไฟล์ใหม่", status: 409 };
+      if (previous.length !== mergeIds.length) throw new HttpError("อุปกรณ์เดิมบางตัวถูกลบไปแล้ว ลองโหลดไฟล์ใหม่", 409);
 
       // File values win when present; blanks keep the existing value; notes are appended
       const columns = DEVICE_FIELDS.map((f) => merges.map((d) => clean(d?.[f])));
@@ -118,9 +123,20 @@ export const POST = handler(async (request, { user }) => {
       );
     }
 
-    return { site_id: site.id, job_id: job.id, inserted, merged: merges.length, moved, removed_jobs: removedJobs };
+    let referenced = 0;
+    if (refIds.length > 0) {
+      const res = await db.query(
+        `INSERT INTO job_device_refs (job_id, device_id, created_by)
+         SELECT $1, d.id, $3 FROM devices d WHERE d.id = ANY($2::int[]) AND d.job_id IS DISTINCT FROM $1
+         ON CONFLICT DO NOTHING`,
+        [job.id, refIds, user.username]
+      );
+      if (res.rowCount !== refIds.length) throw new HttpError("อุปกรณ์เดิมบางตัวถูกลบไปแล้ว ลองโหลดไฟล์ใหม่", 409);
+      referenced = res.rowCount;
+    }
+
+    return { site_id: site.id, job_id: job.id, inserted, merged: merges.length, moved, referenced, removed_jobs: removedJobs };
   });
 
-  if (result.error) return error(result.error, result.status);
   return json(result, 201);
 });

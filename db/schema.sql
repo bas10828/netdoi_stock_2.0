@@ -106,6 +106,19 @@ CREATE TABLE IF NOT EXISTS device_moves (
 CREATE INDEX IF NOT EXISTS device_moves_device_id_idx ON device_moves (device_id);
 CREATE INDEX IF NOT EXISTS device_moves_from_job_id_idx ON device_moves (from_job_id);
 
+-- A device that stays where it is (installed under devices.job_id) but is also
+-- listed in another job's Inventory report, e.g. a later project that extends
+-- the same building's system. Not a move: no history, the device is unchanged.
+CREATE TABLE IF NOT EXISTS job_device_refs (
+  job_id     INTEGER NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
+  device_id  INTEGER NOT NULL REFERENCES devices(id) ON DELETE CASCADE,
+  note       TEXT,
+  created_by TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (job_id, device_id)
+);
+CREATE INDEX IF NOT EXISTS job_device_refs_device_id_idx ON job_device_refs (device_id);
+
 -- Devices with their job/site and a status derived from claims:
 --   claim    = has an open claim
 --   replaced = a claim returned a new unit in its place
@@ -123,7 +136,10 @@ SELECT
     WHEN EXISTS (SELECT 1 FROM claims c WHERE c.device_id = d.id AND c.returned_on IS NULL) THEN 'claim'
     WHEN EXISTS (SELECT 1 FROM claims c WHERE c.device_id = d.id AND c.result = 'replaced') THEN 'replaced'
     ELSE 'ok'
-  END AS status
+  END AS status,
+  (SELECT count(*)::int FROM job_device_refs r WHERE r.device_id = d.id) AS shared_count,
+  -- Display label; devices sent for claim that aren't in any report have no job
+  coalesce(s.name || ' · ' || j.name, 'ไม่สังกัดงาน') AS place
 FROM devices d
 LEFT JOIN jobs j ON j.id = d.job_id
 LEFT JOIN sites s ON s.id = j.site_id;

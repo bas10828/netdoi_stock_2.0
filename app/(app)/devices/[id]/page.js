@@ -8,6 +8,9 @@ import PageHeader from "@/components/PageHeader";
 import StatusBadge from "@/components/StatusBadge";
 import EditDialog from "@/components/EditDialog";
 import MoveDialog from "./MoveDialog";
+import ReceiveClaimDialog from "@/components/ReceiveClaimDialog";
+import { LinkButton } from "@/components/Links";
+import BuildCircleOutlined from "@mui/icons-material/BuildCircleOutlined";
 import { TextLink } from "@/components/Links";
 import { fontMono } from "@/lib/fonts";
 
@@ -24,7 +27,9 @@ function buildTimeline(device) {
   const events = [
     first
       ? { key: "install", date: first.from_delivered_on, tone: "success", title: "ติดตั้ง", detail: first.from_label, sortFirst: true }
-      : { key: "install", date: device.job_delivered_on, tone: "success", title: "ติดตั้ง", detail: `${device.site_name} · ${device.job_name}` },
+      : device.job_id
+        ? { key: "install", date: device.job_delivered_on, tone: "success", title: "ติดตั้ง", detail: device.place }
+        : { key: "install", date: device.created_on, tone: "neutral", title: "เพิ่มเข้าระบบ", detail: "ไม่สังกัดงาน (เช่น เพิ่มตอนส่งเคลม)" },
   ];
   for (const m of device.moves) {
     const where = m.from_location !== m.to_location ? `ตำแหน่ง: ${m.from_location || "—"} → ${m.to_location || "—"}` : null;
@@ -73,21 +78,36 @@ export default async function DevicePage({ params }) {
     ["หมายเหตุ", device.note],
   ];
   const timeline = buildTimeline(device);
+  const openClaim = device.claims.find((c) => c.device_id === device.id && !c.returned_on);
 
   return (
     <>
       <PageHeader
-        crumbs={[
-          { label: "สถานที่", href: "/sites" },
-          { label: device.site_name, href: `/sites/${device.site_id}` },
-          { label: device.job_name, href: `/jobs/${device.job_id}` },
-          { label: device.serial || title },
-        ]}
+        crumbs={
+          device.job_id
+            ? [
+                { label: "สถานที่", href: "/sites" },
+                { label: device.site_name, href: `/sites/${device.site_id}` },
+                { label: device.job_name, href: `/jobs/${device.job_id}` },
+                { label: device.serial || title },
+              ]
+            : [{ label: "ไม่สังกัดงาน", href: "/" }, { label: device.serial || title }]
+        }
         eyebrow={<StatusBadge status={device.status} sx={{ alignSelf: "flex-start" }} />}
         title={title}
-        subtitle={`${device.site_name} · ${device.job_name}`}
+        subtitle={device.job_id ? device.place : "ไม่สังกัดงาน · ใช้ “ย้ายไปงานอื่น” เพื่อใส่เข้างาน"}
         actions={
           <>
+          {openClaim && (
+            <ReceiveClaimDialog
+              claim={{ id: openClaim.id, serial: device.serial, brand: device.brand, model: device.model, sent_on: openClaim.sent_on }}
+            />
+          )}
+          {device.status === "ok" && (
+            <LinkButton href={`/claims/new?device=${device.id}`} variant="outlined" startIcon={<BuildCircleOutlined />}>
+              ส่งเคลม
+            </LinkButton>
+          )}
           <MoveDialog deviceId={device.id} currentJobId={device.job_id} location={device.location ?? ""} />
           <EditDialog
             title="แก้ไขอุปกรณ์"
@@ -145,6 +165,19 @@ export default async function DevicePage({ params }) {
               </Box>
             ))}
           </Box>
+          {device.refs.length > 0 && (
+            <Box sx={{ mt: 2.5, pt: 2, borderTop: 1, borderColor: "divider" }}>
+              <Typography sx={{ fontSize: 13, fontWeight: 600, mb: 0.75 }}>อยู่ในรายงานของงานอื่นด้วย (ไม่ได้ย้าย)</Typography>
+              {device.refs.map((r) => (
+                <Typography key={r.job_id} sx={{ fontSize: 13 }}>
+                  <TextLink href={`/jobs/${r.job_id}`}>{r.site_name} · {r.job_name}</TextLink>
+                  <Box component="span" sx={{ color: "text.secondary" }}>
+                    {r.delivered_on ? ` · ${formatDate(r.delivered_on)}` : ""}
+                  </Box>
+                </Typography>
+              ))}
+            </Box>
+          )}
           {device.claims.length === 0 && (
             <Typography sx={{ fontSize: 13, color: "text.secondary", mt: 2 }}>ยังไม่เคยส่งเคลม</Typography>
           )}

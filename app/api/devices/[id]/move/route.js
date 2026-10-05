@@ -1,4 +1,4 @@
-import { error, handler, json } from "@/lib/api";
+import { error, handler, HttpError, json } from "@/lib/api";
 import { transaction } from "@/lib/db";
 import { clean, toId } from "@/lib/format";
 import { recordMoves, snapshotDevices, todayIso } from "@/lib/moves";
@@ -15,10 +15,10 @@ export const POST = handler(async (request, { params, user }) => {
 
   const result = await transaction(async (db) => {
     const [before] = await snapshotDevices(db, [id]);
-    if (!before) return { error: "ไม่พบอุปกรณ์", status: 404 };
-    if (before.job_id === toJobId) return { error: "อุปกรณ์อยู่ในงานนี้อยู่แล้ว", status: 400 };
+    if (!before) throw new HttpError("ไม่พบอุปกรณ์", 404);
+    if (before.job_id === toJobId) throw new HttpError("อุปกรณ์อยู่ในงานนี้อยู่แล้ว", 400);
     const { rowCount } = await db.query(`SELECT 1 FROM jobs WHERE id = $1`, [toJobId]);
-    if (!rowCount) return { error: "ไม่พบงานปลายทาง", status: 404 };
+    if (!rowCount) throw new HttpError("ไม่พบงานปลายทาง", 404);
 
     // Blank location keeps the current one
     await db.query(`UPDATE devices SET job_id = $2, location = COALESCE($3, location) WHERE id = $1`, [
@@ -36,6 +36,5 @@ export const POST = handler(async (request, { params, user }) => {
     return { ok: true };
   });
 
-  if (result.error) return error(result.error, result.status);
   return json(result);
 });

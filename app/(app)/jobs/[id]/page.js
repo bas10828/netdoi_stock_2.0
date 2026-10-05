@@ -10,6 +10,8 @@ import PageHeader from "@/components/PageHeader";
 import EditDialog from "@/components/EditDialog";
 import { TextLink } from "@/components/Links";
 import { fontMono } from "@/lib/fonts";
+import StatusBadge from "@/components/StatusBadge";
+import RemoveRefButton from "./RemoveRefButton";
 import DevicesTable from "./DevicesTable";
 
 export async function generateMetadata({ params }) {
@@ -27,6 +29,7 @@ export default async function JobPage({ params }) {
   const subtitle = [
     `ส่งงาน ${formatDate(job.delivered_on)}`,
     `${job.device_count} อุปกรณ์`,
+    job.refs.length > 0 && `+ อุปกรณ์เดิม ${job.refs.length}`,
     movedOut.length > 0 && `ย้ายออก ${movedOut.length}`,
     job.po_number && `PO ${job.po_number}`,
   ]
@@ -56,7 +59,7 @@ export default async function JobPage({ params }) {
                 note: job.note ?? "",
               }}
               fields={[
-                { name: "name", label: "ชื่องาน", required: true },
+                { name: "name", label: "ชื่องาน", type: "long", required: true },
                 { name: "delivered_on", label: "วันส่งงาน", type: "date", half: true },
                 { name: "po_number", label: "เลข PO", half: true },
                 { name: "note", label: "หมายเหตุ", type: "multiline" },
@@ -69,6 +72,44 @@ export default async function JobPage({ params }) {
         }
       />
       <DevicesTable devices={job.devices} />
+
+      {job.refs.length > 0 && (
+        <Box component="section" sx={{ mt: 4 }}>
+          <Typography variant="h2">อุปกรณ์เดิมที่อยู่ในรายงานนี้ ({job.refs.length})</Typography>
+          <Typography sx={{ fontSize: 13, color: "text.secondary", mb: 1.5 }}>
+            ติดตั้งไว้ในงานอื่นและยังอยู่ที่เดิม · อยู่ใน Inventory ของงานนี้ด้วย จึงรวมอยู่ใน Export
+          </Typography>
+          <Card>
+            {job.refs.map((d) => (
+              <Box
+                key={d.id}
+                sx={{
+                  display: "grid",
+                  gridTemplateColumns: { xs: "1fr auto", md: "minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 1.6fr) auto auto" },
+                  gap: { xs: 0.25, md: 2 },
+                  alignItems: "center",
+                  px: 2,
+                  py: 1,
+                  borderTop: 1,
+                  borderColor: "divider",
+                  "&:first-of-type": { borderTop: 0 },
+                }}
+              >
+                <Typography sx={{ fontWeight: 500 }}>{[d.brand, d.model].filter(Boolean).join(" ") || "—"}</Typography>
+                <TextLink href={`/devices/${d.id}`} sx={{ fontFamily: fontMono, fontSize: 13 }}>
+                  {d.serial || "ไม่มี serial"}
+                </TextLink>
+                <Typography sx={{ fontSize: 13 }}>
+                  {d.location || "—"} · ติดตั้งในงาน{" "}
+                  <TextLink href={`/jobs/${d.job_id}`}>{d.site_name} · {d.job_name}</TextLink>
+                </Typography>
+                <StatusBadge status={d.status} />
+                <RemoveRefButton jobId={job.id} deviceId={d.id} serial={d.serial} />
+              </Box>
+            ))}
+          </Card>
+        </Box>
+      )}
 
       {movedOut.length > 0 && (
         <Box component="section" sx={{ mt: 4 }}>

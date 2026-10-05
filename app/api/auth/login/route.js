@@ -47,8 +47,8 @@ export async function POST(request) {
   res.cookies.set(SESSION_COOKIE, await createSessionToken(user), {
     httpOnly: true,
     sameSite: "lax",
-    // Secure only behind HTTPS (Cloudflare/nginx), so plain-HTTP LAN access still works
-    secure: request.headers.get("x-forwarded-proto") === "https",
+    // Secure only over HTTPS (direct, or behind Cloudflare/nginx), so plain-HTTP LAN access still works
+    secure: request.nextUrl.protocol === "https:" || request.headers.get("x-forwarded-proto") === "https",
     path: "/",
     maxAge: SESSION_MAX_AGE,
   });

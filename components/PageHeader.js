@@ -3,6 +3,16 @@ import Breadcrumbs from "@mui/material/Breadcrumbs";
 import Typography from "@mui/material/Typography";
 import { TextLink } from "./Links";
 
+// Long site/job names are cut with "…" in the breadcrumb; the full name is in the title
+const crumbSx = {
+  display: "inline-block",
+  maxWidth: { xs: 140, sm: 260 },
+  overflow: "hidden",
+  textOverflow: "ellipsis",
+  whiteSpace: "nowrap",
+  verticalAlign: "bottom",
+};
+
 // crumbs: [{ label, href }]; the last one is the current page (no link)
 export default function PageHeader({ crumbs, title, subtitle, actions, eyebrow }) {
   return (
@@ -12,11 +22,11 @@ export default function PageHeader({ crumbs, title, subtitle, actions, eyebrow }
           <Breadcrumbs aria-label="ตำแหน่งปัจจุบัน" sx={{ color: "text.secondary" }}>
             {crumbs.map((c, i) =>
               i < crumbs.length - 1 ? (
-                <TextLink key={i} href={c.href} color="inherit" sx={{ fontWeight: 400 }}>
+                <TextLink key={i} href={c.href} color="inherit" title={c.label} sx={{ fontWeight: 400, ...crumbSx }}>
                   {c.label}
                 </TextLink>
               ) : (
-                <Typography key={i} component="span" sx={{ fontSize: 13, color: "text.primary", fontWeight: 500 }}>
+                <Typography key={i} component="span" title={c.label} sx={{ fontSize: 13, color: "text.primary", fontWeight: 500, ...crumbSx }}>
                   {c.label}
                 </Typography>
               )

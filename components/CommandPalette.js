@@ -112,7 +112,7 @@ function PaletteBody({ onClose }) {
             <Box sx={{ minWidth: 0, flex: 1 }}>
               <Typography sx={{ fontFamily: fontMono, fontSize: 14, fontWeight: 500 }}>{d.serial || "—"}</Typography>
               <Typography noWrap sx={{ fontSize: 13, color: "text.secondary" }}>
-                {[d.brand, d.model].filter(Boolean).join(" ")} · {d.site_name} · {d.job_name}
+                {[d.brand, d.model].filter(Boolean).join(" ")} · {d.place}
               </Typography>
             </Box>
             <StatusBadge status={d.status} />

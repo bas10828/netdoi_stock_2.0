@@ -25,7 +25,8 @@ export const metadata = {
 export default function RootLayout({ children }) {
   return (
     <html lang="th" className={`${sans.variable} ${mono.variable}`} suppressHydrationWarning>
-      <body>
+      {/* Browser extensions add attributes to <body> before React loads; ignore that mismatch */}
+      <body suppressHydrationWarning>
         {/* Sets the light/dark class before paint so there is no flash */}
         <InitColorSchemeScript attribute="class" defaultMode="system" />
         <Providers>{children}</Providers>

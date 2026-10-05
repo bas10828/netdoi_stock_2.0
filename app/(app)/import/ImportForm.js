@@ -11,6 +11,7 @@ import FormControlLabel from "@mui/material/FormControlLabel";
 import IconButton from "@mui/material/IconButton";
 import InputBase from "@mui/material/InputBase";
 import LinearProgress from "@mui/material/LinearProgress";
+import CircularProgress from "@mui/material/CircularProgress";
 import Switch from "@mui/material/Switch";
 import Table from "@mui/material/Table";
 import TableBody from "@mui/material/TableBody";
@@ -31,6 +32,7 @@ import InsertDriveFileOutlined from "@mui/icons-material/InsertDriveFileOutlined
 import PageHeader from "@/components/PageHeader";
 import { Pill } from "@/components/StatusBadge";
 import { useToast } from "@/components/Toast";
+import { oneLine } from "@/components/EditDialog";
 import { FIELDS, looksLikeExponent, parseInventory } from "@/lib/parseInventory";
 import { fontMono } from "@/lib/fonts";
 
@@ -54,6 +56,7 @@ const COLUMNS = [
 // What to do with a row whose serial already exists
 const DUP_ACTIONS = {
   merge: "ย้ายเข้างานนี้และอัปเดต",
+  ref: "อยู่ที่เดิม · รวมในรายงานนี้",
   skip: "ข้าม ไม่บันทึก",
   new: "เพิ่มเป็นตัวใหม่",
 };
@@ -113,12 +116,12 @@ function Cell({ value, field, mono, multiline, index, onEdit }) {
 
 // Memoized so typing in one row doesn't re-render the others
 // issueLevel/issueText are plain strings so unchanged rows compare equal
-const PreviewRow = memo(function PreviewRow({ row, index, issueLevel, issueText, isDup, onEdit, onDelete }) {
+const PreviewRow = memo(function PreviewRow({ row, index, issueLevel, issueText, dupAction, onEdit, onDelete }) {
   return (
     <TableRow
       sx={{
         ...(issueLevel === "warn" && { bgcolor: "rgba(var(--mui-palette-warning-mainChannel) / 0.08)" }),
-        ...(isDup && row._dup === "skip" && { "& td > .MuiInputBase-root": { opacity: 0.45 } }),
+        ...(dupAction === "skip" && { "& td > .MuiInputBase-root": { opacity: 0.45 } }),
       }}
     >
       <TableCell sx={{ color: "text.secondary", fontSize: 12, verticalAlign: "top", pt: 1.5 }}>{index + 1}</TableCell>
@@ -129,7 +132,7 @@ const PreviewRow = memo(function PreviewRow({ row, index, issueLevel, issueText,
       ))}
       <TableCell sx={{ fontSize: 12, verticalAlign: "top", pt: 1.5, color: issueColor(issueLevel) }}>
         {issueText || "พร้อม"}
-        {isDup && <DupSelect value={row._dup ?? "merge"} index={index} onEdit={onEdit} />}
+        {dupAction && <DupSelect value={dupAction} index={index} onEdit={onEdit} />}
       </TableCell>
       <TableCell sx={{ verticalAlign: "top", py: 0.5 }}>
         <Tooltip title="ลบแถวนี้">
@@ -143,7 +146,7 @@ const PreviewRow = memo(function PreviewRow({ row, index, issueLevel, issueText,
 });
 
 // Phone version of a preview row: fields stacked in a card
-const PreviewCard = memo(function PreviewCard({ row, index, issueLevel, issueText, isDup, onEdit, onDelete }) {
+const PreviewCard = memo(function PreviewCard({ row, index, issueLevel, issueText, dupAction, onEdit, onDelete }) {
   return (
     <Box
       sx={{
@@ -166,7 +169,7 @@ const PreviewCard = memo(function PreviewCard({ row, index, issueLevel, issueTex
           <DeleteOutline fontSize="small" />
         </IconButton>
       </Box>
-      {isDup && <DupSelect value={row._dup ?? "merge"} index={index} onEdit={onEdit} />}
+      {dupAction && <DupSelect value={dupAction} index={index} onEdit={onEdit} />}
       {COLUMNS.map((c) => (
         <Box key={c.field} sx={{ display: "grid", gridTemplateColumns: "72px minmax(0, 1fr)", alignItems: "center", gap: 1 }}>
           <Typography sx={{ fontSize: 12, color: "text.secondary" }}>{c.label}</Typography>
@@ -195,7 +198,8 @@ export default function ImportForm() {
   const [fileName, setFileName] = useState("");
   const [rows, setRows] = useState([]);
   const [existing, setExisting] = useState({});
-  const [parsing, setParsing] = useState(false);
+  const [parsing, setParsing] = useState("");   // name of the file being read
+  const [checkedKey, setCheckedKey] = useState(null); // serial list the duplicate check finished for
   const [dragging, setDragging] = useState(false);
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(50);
@@ -241,7 +245,7 @@ export default function ImportForm() {
       return;
     }
     setError("");
-    setParsing(true);
+    setParsing(file.name);
     try {
       const { siteName, rows: parsed } = await parseInventory(file);
       if (parsed.length === 0) throw new Error("ไม่พบแถวข้อมูลในไฟล์นี้");
@@ -254,7 +258,7 @@ export default function ImportForm() {
     } catch (err) {
       setError(err.message || "อ่านไฟล์ไม่สำเร็จ");
     } finally {
-      setParsing(false);
+      setParsing("");
     }
   };
 
@@ -278,8 +282,10 @@ export default function ImportForm() {
           (map[norm(d.serial)] ??= []).push(d);
         });
         setExisting(map);
-      } catch {
-        // A failed check only hides the warning; saving still works
+        setCheckedKey(serialKey);
+      } catch (err) {
+        // A failed check only hides the warnings; saving still works
+        if (err.name !== "AbortError") setCheckedKey(serialKey);
       }
     }, 500);
     return () => {
@@ -287,6 +293,23 @@ export default function ImportForm() {
       ctrl.abort();
     };
   }, [serialKey]);
+
+  // Saving waits for the check, otherwise duplicates would be saved as new devices
+  const checking = !!serialKey && checkedKey !== serialKey;
+
+  // What saving does with a row whose serial exists. Unless chosen by hand: same site
+  // and same location means it stayed put (ref), otherwise it was moved here (merge).
+  const dupActionOf = useCallback(
+    (r) => {
+      const match = existing[norm(r.serial)];
+      if (!match) return null;
+      if (r._dup) return r._dup;
+      const d = match[0];
+      const sameSite = matchedSite ? d.site_id === matchedSite.id : norm(d.site_name) === norm(siteInput);
+      return sameSite && norm(r.location) && norm(r.location) === norm(d.location) ? "ref" : "merge";
+    },
+    [existing, matchedSite, siteInput]
+  );
 
   const issues = useMemo(() => {
     const counts = {};
@@ -297,10 +320,12 @@ export default function ImportForm() {
       if (looksLikeExponent(r.serial)) return { level: "warn", kind: "badSerial", text: "serial ถูก Excel ย่อเป็นเลขยกกำลัง แก้ให้ถูกก่อน" };
       if (existing[k]) {
         const d = existing[k][0];
-        const where = `${d.site_name} · ${d.job_name}${existing[k].length > 1 ? ` (มี ${existing[k].length} ตัว ใช้ตัวแรก)` : ""}`;
-        const action = r._dup ?? "merge";
+        const shared = d.shared_in?.length ? ` · ใช้ร่วมกับ ${d.shared_in.join(", ")}` : "";
+        const where = `${d.place}${shared}${existing[k].length > 1 ? ` (มี ${existing[k].length} ตัว ใช้ตัวแรก)` : ""}`;
+        const action = dupActionOf(r);
         if (counts[k] > 1 && action === "merge") return { level: "warn", kind: "dupDb", text: `serial ซ้ำในไฟล์ด้วย · ${where}` };
         if (action === "merge") return { level: "info", kind: "dupDb", text: `ย้ายจาก ${where}` };
+        if (action === "ref") return { level: "info", kind: "dupDb", text: `ใช้ร่วมกัน · ติดตั้งที่ ${where}` };
         if (action === "skip") return { level: "info", kind: "dupDb", text: `ข้าม · มีอยู่ที่ ${where}` };
         return { level: "warn", kind: "dupDb", text: `ซ้ำกับ ${where} · จะเพิ่มเป็นตัวใหม่` };
       }
@@ -308,29 +333,29 @@ export default function ImportForm() {
       if (!r.mac) return { level: "info", kind: "noMac", text: "ไม่มี MAC (บันทึกได้)" };
       return null;
     });
-  }, [rows, existing, serialList]);
+  }, [rows, existing, serialList, dupActionOf]);
 
   const summary = useMemo(() => {
     // merge/skip/new: what saving will do with each row
-    const s = { warn: 0, dupDb: 0, dupFile: 0, noSerial: 0, badSerial: 0, noMac: 0, merge: 0, skip: 0, new: 0, dupNew: 0 };
+    const s = { warn: 0, dupDb: 0, dupFile: 0, noSerial: 0, badSerial: 0, noMac: 0, merge: 0, ref: 0, skip: 0, new: 0, dupNew: 0 };
     issues.forEach((i, index) => {
       if (i) {
         s[i.kind] += 1;
         if (i.level === "warn") s.warn += 1;
       }
-      const action = i?.kind === "dupDb" ? (rows[index]._dup ?? "merge") : "new";
+      const action = i?.kind === "dupDb" ? dupActionOf(rows[index]) : "new";
       s[action] += 1;
       if (i?.kind === "dupDb" && action === "new") s.dupNew += 1;
     });
     return s;
-  }, [issues, rows]);
+  }, [issues, rows, dupActionOf]);
 
   // Apply one action to every row that matches an existing device
   const setAllDup = (action) => {
     setRows((prev) => prev.map((r) => (existing[norm(r.serial)] ? { ...r, _dup: action } : r)));
   };
   const allDupAction =
-    summary.merge === summary.dupDb ? "merge" : summary.skip === summary.dupDb ? "skip" : summary.dupNew === summary.dupDb ? "new" : null;
+    ["merge", "ref", "skip"].find((a) => summary[a] === summary.dupDb) ?? (summary.dupNew === summary.dupDb ? "new" : null);
 
   const onEdit = useCallback((index, field, value) => {
     setRows((prev) => {
@@ -362,7 +387,7 @@ export default function ImportForm() {
   const pageRows = visible.slice(safePage * rowsPerPage, (safePage + 1) * rowsPerPage);
 
   const toSave = rows.length - summary.skip;
-  const canSave = toSave > 0 && jobName.trim() && (siteId || siteInput.trim()) && !saving;
+  const canSave = toSave > 0 && jobName.trim() && (siteId || siteInput.trim()) && !saving && !checking;
 
   const save = async () => {
     setSaving(true);
@@ -377,8 +402,9 @@ export default function ImportForm() {
           job: { name: jobName, delivered_on: deliveredOn, po_number: poNumber, note },
           devices: rows.flatMap((r) => {
             const match = existing[norm(r.serial)];
-            const action = match ? (r._dup ?? "merge") : "new";
+            const action = match ? dupActionOf(r) : "new";
             if (action === "skip") return [];
+            if (action === "ref") return [{ ref_device_id: match[0].id }];
             const device = Object.fromEntries(FIELDS.map((f) => [f, r[f]]));
             return [action === "merge" ? { ...device, merge_device_id: match[0].id } : device];
           }),
@@ -390,6 +416,7 @@ export default function ImportForm() {
         `บันทึกเข้า “${jobName.trim()}” แล้ว · เพิ่มใหม่ ${data.inserted}` +
           (data.merged ? ` · ย้ายและอัปเดต ${data.merged}` : "") +
           (data.moved ? ` (ย้ายจากงานอื่น ${data.moved} จดประวัติไว้แล้ว)` : "") +
+          (data.referenced ? ` · อยู่ที่เดิมรวมในรายงาน ${data.referenced}` : "") +
           (data.removed_jobs ? ` · ลบงานเดิมที่ว่าง ${data.removed_jobs}` : "")
       );
       router.push(`/jobs/${data.job_id}`);
@@ -445,7 +472,16 @@ export default function ImportForm() {
                 </Typography>
               )}
             </Box>
-            <TextField label="ชื่องาน" required value={jobName} onChange={(e) => setJobName(e.target.value)} placeholder="เช่น กล้อง CCTV, AP WiFi" />
+            <TextField
+              label="ชื่องาน"
+              required
+              value={jobName}
+              onChange={(e) => setJobName(oneLine(e.target.value))}
+              onKeyDown={(e) => e.key === "Enter" && e.preventDefault()}
+              multiline
+              maxRows={5}
+              placeholder="เช่น กล้อง CCTV, AP WiFi"
+            />
             <TextField label="วันส่งงาน" type="date" value={deliveredOn} onChange={(e) => setDeliveredOn(e.target.value)} slotProps={{ inputLabel: { shrink: true } }} />
           </Box>
 
@@ -496,14 +532,25 @@ export default function ImportForm() {
               "&:focus-within": { outline: "2px solid", outlineColor: "primary.main", outlineOffset: 2 },
             }}
           >
-            <UploadFileOutlined sx={{ fontSize: 36, color: dragging ? "primary.main" : "text.secondary" }} />
-            <Typography sx={{ fontWeight: 600 }}>{dragging ? "ปล่อยไฟล์ตรงนี้" : "ลากไฟล์ Excel มาวาง หรือกดเพื่อเลือกไฟล์"}</Typography>
-            <Typography sx={{ fontSize: 13, color: "text.secondary" }}>.xlsx, .xls · ชื่อสถานที่ในไฟล์จะถูกเติมให้อัตโนมัติ</Typography>
+            {parsing ? (
+              <>
+                <CircularProgress size={34} />
+                <Typography sx={{ fontWeight: 600 }} role="status">กำลังอ่านไฟล์…</Typography>
+                <Typography sx={{ fontSize: 13, color: "text.secondary", overflowWrap: "anywhere" }}>{parsing}</Typography>
+              </>
+            ) : (
+              <>
+                <UploadFileOutlined sx={{ fontSize: 36, color: dragging ? "primary.main" : "text.secondary" }} />
+                <Typography sx={{ fontWeight: 600 }}>{dragging ? "ปล่อยไฟล์ตรงนี้" : "ลากไฟล์ Excel มาวาง หรือกดเพื่อเลือกไฟล์"}</Typography>
+                <Typography sx={{ fontSize: 13, color: "text.secondary" }}>.xlsx, .xls · ชื่อสถานที่ในไฟล์จะถูกเติมให้อัตโนมัติ</Typography>
+              </>
+            )}
             <input
               ref={fileInput}
               type="file"
               accept=".xlsx,.xls"
               onChange={(e) => loadFile(e.target.files[0])}
+              disabled={!!parsing}
               style={{ position: "absolute", width: 1, height: 1, opacity: 0, overflow: "hidden" }}
             />
             {parsing && <LinearProgress sx={{ position: "absolute", left: 0, right: 0, bottom: 0, borderRadius: "0 0 12px 12px" }} />}
@@ -530,9 +577,18 @@ export default function ImportForm() {
               </Box>
             </Box>
 
+            {(checking || saving) && (
+              <Alert severity="info" icon={<CircularProgress size={18} />} role="status" sx={{ alignItems: "center" }}>
+                {saving
+                  ? `กำลังบันทึก ${toSave} รายการ… อย่าเพิ่งปิดหน้านี้`
+                  : "กำลังตรวจ serial กับข้อมูลในระบบ… ผลแถวซ้ำจะขึ้นเมื่อเสร็จ"}
+                <LinearProgress sx={{ mt: 1, borderRadius: 1 }} />
+              </Alert>
+            )}
+
             <Box sx={{ display: { xs: "flex", md: "none" }, flexDirection: "column", gap: 1 }}>
               {pageRows.map(({ row, index }) => (
-                <PreviewCard key={row._key} row={row} index={index} issueLevel={issues[index]?.level} issueText={issues[index]?.text} isDup={issues[index]?.kind === "dupDb"} onEdit={onEdit} onDelete={onDelete} />
+                <PreviewCard key={row._key} row={row} index={index} issueLevel={issues[index]?.level} issueText={issues[index]?.text} dupAction={issues[index]?.kind === "dupDb" ? dupActionOf(row) : undefined} onEdit={onEdit} onDelete={onDelete} />
               ))}
             </Box>
 
@@ -573,7 +629,7 @@ export default function ImportForm() {
                   </TableHead>
                   <TableBody>
                     {pageRows.map(({ row, index }) => (
-                      <PreviewRow key={row._key} row={row} index={index} issueLevel={issues[index]?.level} issueText={issues[index]?.text} isDup={issues[index]?.kind === "dupDb"} onEdit={onEdit} onDelete={onDelete} />
+                      <PreviewRow key={row._key} row={row} index={index} issueLevel={issues[index]?.level} issueText={issues[index]?.text} dupAction={issues[index]?.kind === "dupDb" ? dupActionOf(row) : undefined} onEdit={onEdit} onDelete={onDelete} />
                     ))}
                   </TableBody>
                 </Table>
@@ -612,8 +668,10 @@ export default function ImportForm() {
               <Button variant="contained" onClick={save} disabled={!canSave} sx={{ minWidth: 160 }}>
                 {saving
                   ? "กำลังบันทึก…"
-                  : summary.merge > 0
-                    ? `บันทึก (ใหม่ ${summary.new} · ย้าย ${summary.merge})`
+                  : checking
+                    ? "กำลังตรวจ…"
+                  : summary.merge + summary.ref > 0
+                    ? `บันทึก (ใหม่ ${summary.new}${summary.merge ? ` · ย้าย ${summary.merge}` : ""}${summary.ref ? ` · อยู่ที่เดิม ${summary.ref}` : ""})`
                     : `บันทึก ${toSave} รายการ`}
               </Button>
             </Box>

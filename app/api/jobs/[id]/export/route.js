@@ -10,8 +10,10 @@ export const GET = handler(async (request, { params }) => {
   if (!job) return error("ไม่พบงาน", 404);
 
   const header = ["NO.", "Device Type", "Brand", "Model", "Serial Number", "MAC Address", "Device Name", "IP Address", "Location", "Remark", "Status"];
-  const rows = job.devices.map((d, i) => [
-    i + 1, d.device_type, d.brand, d.model, d.serial, d.mac, d.device_name, d.ip, d.location, d.note, STATUS[d.status]?.label,
+  // The job's own devices, then those it lists but that stayed in another job
+  const rows = [...job.devices, ...job.refs].map((d, i) => [
+    i + 1, d.device_type, d.brand, d.model, d.serial, d.mac, d.device_name, d.ip, d.location, d.note,
+    d.job_id === job.id ? STATUS[d.status]?.label : `อุปกรณ์เดิม (${d.site_name} · ${d.job_name})`,
   ]);
   const sheet = XLSX.utils.aoa_to_sheet([
     ["INVENTORY"],
@@ -20,7 +22,7 @@ export const GET = handler(async (request, { params }) => {
     header,
     ...rows,
   ]);
-  sheet["!cols"] = [6, 14, 14, 22, 20, 20, 18, 16, 28, 24, 12].map((wch) => ({ wch }));
+  sheet["!cols"] = [6, 14, 14, 22, 20, 20, 18, 16, 28, 24, 30].map((wch) => ({ wch }));
 
   const book = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(book, sheet, "Inventory");
