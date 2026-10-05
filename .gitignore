@@ -45,3 +45,5 @@ next-env.d.ts
 
 # HTTPS dev certificate (scripts/dev-cert.mjs)
 /certificates/
+/public/dev-ca.crt
+/public/zxing_reader.wasm

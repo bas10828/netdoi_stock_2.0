@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { SESSION_COOKIE, verifySessionToken } from "@/lib/session";
 
 const PUBLIC_API = ["/api/auth/login"];
+// Phones open these before logging in, to trust the dev HTTPS certificate
+const PUBLIC_PAGES = ["/phone-setup", "/dev-ca.crt"];
 
 export async function proxy(request) {
   const { pathname, search } = request.nextUrl;
@@ -10,7 +12,7 @@ export async function proxy(request) {
   if (pathname === "/login") {
     return user ? NextResponse.redirect(new URL("/", request.url)) : NextResponse.next();
   }
-  if (PUBLIC_API.includes(pathname)) return NextResponse.next();
+  if (PUBLIC_API.includes(pathname) || PUBLIC_PAGES.includes(pathname)) return NextResponse.next();
 
   if (!user) {
     if (pathname.startsWith("/api/")) {
@@ -25,5 +27,5 @@ export async function proxy(request) {
 
 export const config = {
   // Everything except Next.js assets and files in public/
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\.(?:png|jpg|jpeg|svg|ico|webp|woff2?)$).*)"],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\.(?:png|jpg|jpeg|svg|ico|webp|woff2?|wasm)$).*)"],
 };

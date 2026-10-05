@@ -20,20 +20,41 @@ import FilterListIcon from "@mui/icons-material/FilterList";
 import StatusBadge, { Pill } from "@/components/StatusBadge";
 import { STATUS, searchKey } from "@/lib/format";
 import { fontMono } from "@/lib/fonts";
+import RemoveRefButton from "./RemoveRefButton";
 
 const mono = { fontFamily: fontMono, fontSize: 13 };
 // Notes can be several lines (e.g. merged v1 comments); keep line breaks
 const noteSx = { fontSize: 13, whiteSpace: "pre-line", overflowWrap: "anywhere" };
 
-export default function DevicesTable({ devices }) {
+// Small line under a stayed-put device: where it is actually installed
+function RefNote({ d }) {
+  return (
+    <Box sx={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 0.75, mt: 0.5 }}>
+      <Pill color="neutral">อุปกรณ์เดิม</Pill>
+      <Typography component="span" sx={{ fontSize: 12, color: "text.secondary" }}>
+        ติดตั้งใน{" "}
+        <Link component={NextLink} href={`/jobs/${d.job_id}`} onClick={(e) => e.stopPropagation()}>
+          {d.place}
+        </Link>
+      </Typography>
+    </Box>
+  );
+}
+
+// devices: installed in this job. refs: installed elsewhere but listed in this job's report.
+export default function DevicesTable({ devices: own, refs = [], jobId }) {
+  const devices = useMemo(() => [...own, ...refs.map((r) => ({ ...r, isRef: true }))], [own, refs]);
   const [filter, setFilter] = useState("");
   const [status, setStatus] = useState("all");
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(50);
 
   const counts = useMemo(() => {
-    const c = { all: devices.length, ok: 0, claim: 0, replaced: 0 };
-    devices.forEach((d) => (c[d.status] += 1));
+    const c = { all: devices.length, ok: 0, claim: 0, replaced: 0, ref: 0 };
+    devices.forEach((d) => {
+      c[d.status] += 1;
+      if (d.isRef) c.ref += 1;
+    });
     return c;
   }, [devices]);
 
@@ -41,11 +62,11 @@ export default function DevicesTable({ devices }) {
     const text = filter.trim().toLowerCase();
     const key = searchKey(filter);
     return devices.filter((d) => {
-      if (status !== "all" && d.status !== status) return false;
+      if (status === "ref" ? !d.isRef : status !== "all" && d.status !== status) return false;
       if (!text) return true;
       return (
         (key && (searchKey(d.serial).includes(key) || searchKey(d.mac).includes(key))) ||
-        [d.brand, d.model, d.device_type, d.device_name, d.location, d.ip, d.note].some((v) => v?.toLowerCase().includes(text))
+        [d.brand, d.model, d.device_type, d.device_name, d.location, d.ip, d.note, d.isRef && d.place].some((v) => v?.toLowerCase().includes(text))
       );
     });
   }, [devices, filter, status]);
@@ -96,6 +117,7 @@ export default function DevicesTable({ devices }) {
               </ToggleButton>
             ) : null
           )}
+          {counts.ref > 0 && <ToggleButton value="ref">อุปกรณ์เดิม {counts.ref}</ToggleButton>}
         </ToggleButtonGroup>
       </Box>
 
@@ -103,7 +125,7 @@ export default function DevicesTable({ devices }) {
       <Box sx={{ display: { xs: "flex", sm: "none" }, flexDirection: "column", gap: 1 }}>
         {pageRows.map((d) => (
           <Box
-            key={d.id}
+            key={(d.isRef ? "r" : "d") + d.id}
             component={NextLink}
             href={`/devices/${d.id}`}
             sx={{ display: "flex", flexDirection: "column", gap: 0.5, p: 1.75, border: 1, borderColor: "divider", borderRadius: 2.5, bgcolor: "background.paper", color: "text.primary", textDecoration: "none" }}
@@ -118,7 +140,11 @@ export default function DevicesTable({ devices }) {
               {[d.device_type, d.device_name, d.location].filter(Boolean).join(" · ")}
             </Typography>
             {d.note && <Typography sx={{ ...noteSx, mt: 0.25 }}>{d.note}</Typography>}
-            {d.shared_count > 0 && <Pill color="primary" sx={{ alignSelf: "flex-start" }}>ใช้ร่วมกับอีก {d.shared_count} งาน</Pill>}
+            {d.isRef ? (
+              <RefNote d={d} />
+            ) : (
+              d.shared_count > 0 && <Pill color="primary" sx={{ alignSelf: "flex-start" }}>ใช้ร่วมกับอีก {d.shared_count} งาน</Pill>
+            )}
           </Box>
         ))}
         {pageRows.length === 0 && (
@@ -141,7 +167,7 @@ export default function DevicesTable({ devices }) {
             </TableHead>
             <TableBody>
               {pageRows.map((d) => (
-                <TableRow key={d.id} hover>
+                <TableRow key={(d.isRef ? "r" : "d") + d.id} hover>
                   <TableCell>
                     <Typography sx={{ fontWeight: 500 }}>
                       {[d.brand, d.model].filter(Boolean).join(" ") || "—"}
@@ -149,8 +175,10 @@ export default function DevicesTable({ devices }) {
                     <Typography sx={{ fontSize: 12, color: "text.secondary" }}>
                       {[d.device_type, d.device_name].filter(Boolean).join(" · ")}
                     </Typography>
-                    {d.shared_count > 0 && (
-                      <Pill color="primary" sx={{ mt: 0.5 }}>ใช้ร่วมกับอีก {d.shared_count} งาน</Pill>
+                    {d.isRef ? (
+                      <RefNote d={d} />
+                    ) : (
+                      d.shared_count > 0 && <Pill color="primary" sx={{ mt: 0.5 }}>ใช้ร่วมกับอีก {d.shared_count} งาน</Pill>
                     )}
                   </TableCell>
                   <TableCell>
@@ -167,7 +195,10 @@ export default function DevicesTable({ devices }) {
                     {d.note ? <Typography sx={noteSx}>{d.note}</Typography> : <Typography sx={{ color: "text.secondary" }}>—</Typography>}
                   </TableCell>
                   <TableCell>
-                    <StatusBadge status={d.status} />
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                      <StatusBadge status={d.status} />
+                      {d.isRef && jobId && <RemoveRefButton jobId={jobId} deviceId={d.id} serial={d.serial} />}
+                    </Box>
                   </TableCell>
                 </TableRow>
               ))}

@@ -9,6 +9,8 @@ import CircularProgress from "@mui/material/CircularProgress";
 import SearchIcon from "@mui/icons-material/Search";
 import StatusBadge from "./StatusBadge";
 import useDeviceSearch from "./useDeviceSearch";
+import ScanButton from "./ScanButton";
+import findScanned from "./findScanned";
 import { fontMono } from "@/lib/fonts";
 
 // Search-as-you-type dialog for serial/MAC. Opened with Ctrl+K / ⌘K or the top bar button.
@@ -77,6 +79,19 @@ function PaletteBody({ onClose }) {
           sx={{ minHeight: 56, fontSize: 16, fontFamily: fontMono }}
         />
         {loading && <CircularProgress size={18} />}
+        <ScanButton
+          edge={false}
+          onScan={async (value, label) => {
+            try {
+              const { devices } = await findScanned(value, label);
+              if (devices.length === 1) return go(devices[0]);
+              setQ(devices[0]?.serial || label?.serial || label?.mac || value);
+            } catch {
+              setQ(label?.serial || value);
+            }
+            setActive(0);
+          }}
+        />
         <Box component="kbd" sx={kbdSx}>Esc</Box>
       </Box>
 

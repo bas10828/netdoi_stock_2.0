@@ -101,22 +101,28 @@ export default function NewClaimForm() {
   };
 
   // Look up an exact serial/MAC and add it (or ask which one if several match)
-  const addCode = async (raw) => {
-    const value = raw.trim();
-    if (!value) return;
+  // raw: typed text or the scanned value; label: the scanner's { serial, mac } if scanned
+  const addCode = async (raw, label) => {
+    const value = (label?.serial || raw || "").trim();
+    if (!value && !label?.mac) return;
     setCode("");
     setLooking(true);
     setNotice(null);
     try {
-      const res = await fetch(`/api/devices/lookup?serial=${encodeURIComponent(value)}`);
-      const { devices = [], error: err } = await res.json();
-      if (!res.ok) throw new Error(err);
+      let devices = [];
+      for (const v of [value, label?.mac].filter(Boolean)) {
+        const res = await fetch(`/api/devices/lookup?serial=${encodeURIComponent(v)}`);
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+        devices = data.devices ?? [];
+        if (devices.length > 0) break;
+      }
       if (devices.length === 1) addDevice(devices[0]);
       else if (devices.length > 1) setChoices(devices);
       else {
         setItems((prev) => {
           if (prev.some((i) => !i.device && norm(i.serial) === norm(value))) return prev;
-          return [...prev, { key: `n${Date.now()}`, device: null, serial: value, brand: "", model: "", symptom: "" }];
+          return [...prev, { key: `n${Date.now()}`, device: null, serial: value || label.mac, mac: label?.mac ?? "", brand: label?.brand ?? "", model: label?.model ?? "", symptom: "" }];
         });
         setNotice({ severity: "info", text: `${value} ไม่มีในระบบ · เพิ่มในรายการแล้ว กรอก Brand/Model ได้` });
       }
@@ -157,7 +163,7 @@ export default function NewClaimForm() {
         body: JSON.stringify({
           ...form,
           items: items.map((i) =>
-            i.device ? { device_id: i.device.id, symptom: i.symptom } : { serial: i.serial, brand: i.brand, model: i.model, symptom: i.symptom }
+            i.device ? { device_id: i.device.id, symptom: i.symptom } : { serial: i.serial, mac: i.mac, brand: i.brand, model: i.model, symptom: i.symptom }
           ),
         }),
       });

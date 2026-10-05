@@ -13,8 +13,9 @@
     "db:export-legacy": "node scripts/export-legacy.mjs",
     "db:legacy-mapping": "node scripts/legacy-mapping.mjs",
     "db:migrate-legacy": "node --env-file=.env scripts/migrate-legacy.mjs",
-    "predev": "node scripts/dev-cert.mjs",
-    "dev:http": "next dev -H 0.0.0.0 -p 3100"
+    "predev": "node scripts/copy-wasm.mjs && node scripts/dev-cert.mjs",
+    "dev:http": "next dev -H 0.0.0.0 -p 3100",
+    "prebuild": "node scripts/copy-wasm.mjs"
   },
   "dependencies": {
     "@emotion/cache": "^11.14.0",
@@ -31,7 +32,8 @@
     "pg": "^8.23.1",
     "react": "19.2.8",
     "react-dom": "19.2.8",
-    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
+    "zxing-wasm": "^3.1.4"
   },
   "devDependencies": {
     "eslint": "^9",

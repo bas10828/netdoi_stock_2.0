@@ -136,7 +136,13 @@ export default function ReceiveClaimDialog({ claim, size = "medium", variant = "
                     onChange={set("serial")}
                     slotProps={{
                       htmlInput: { style: { fontFamily: fontMono } },
-                      input: { endAdornment: <ScanButton onScan={(v) => setForm((f) => ({ ...f, serial: v }))} /> },
+                      input: {
+                        endAdornment: (
+                          <ScanButton
+                            onScan={(v, l) => setForm((f) => ({ ...f, serial: l?.serial || v, mac: l?.mac || f.mac, model: l?.model || f.model }))}
+                          />
+                        ),
+                      },
                     }}
                   />
                   <TextField label="MAC ตัวใหม่" value={form.mac} onChange={set("mac")} slotProps={{ htmlInput: { style: { fontFamily: fontMono } } }} helperText="ไม่มีเว้นว่างได้" />

@@ -140,13 +140,16 @@ export default function AppShell({ user, openClaims = 0, children }) {
   }, []);
 
   // Scan anywhere: one exact match opens the device, otherwise search for it
-  const onScan = async (code) => {
-    try {
-      const res = await fetch(`/api/devices/lookup?serial=${encodeURIComponent(code)}`);
-      const { devices = [] } = await res.json();
-      if (res.ok && devices.length === 1) return router.push(`/devices/${devices[0].id}`);
-    } catch {
-      // fall through to the search page
+  const onScan = async (code, label) => {
+    for (const value of [label?.serial, label?.mac].filter(Boolean)) {
+      try {
+        const res = await fetch(`/api/devices/lookup?serial=${encodeURIComponent(value)}`);
+        const { devices = [] } = await res.json();
+        if (res.ok && devices.length === 1) return router.push(`/devices/${devices[0].id}`);
+        if (res.ok && devices.length > 1) break; // several matches: let the search page list them
+      } catch {
+        break;
+      }
     }
     router.push(`/?q=${encodeURIComponent(code)}`);
   };

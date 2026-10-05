@@ -11,6 +11,7 @@ import InputAdornment from "@mui/material/InputAdornment";
 import Visibility from "@mui/icons-material/VisibilityOutlined";
 import VisibilityOff from "@mui/icons-material/VisibilityOffOutlined";
 import ThemeToggle from "@/components/ThemeToggle";
+import { TextLink } from "@/components/Links";
 
 // true once React has hydrated; before that a submit would be a plain form GET
 const subscribe = () => () => {};
@@ -122,6 +123,10 @@ export default function LoginForm() {
         <Button type="submit" variant="contained" size="large" disabled={loading || !hydrated} sx={{ minHeight: 44 }}>
           {!hydrated ? "กำลังโหลด…" : loading ? "กำลังเข้าสู่ระบบ…" : "เข้าสู่ระบบ"}
         </Button>
+        <Typography sx={{ fontSize: 12, color: "text.secondary", textAlign: "center" }}>
+          ใช้มือถือสแกน barcode?{" "}
+          <TextLink href="/phone-setup">ตั้งค่ากล้องสแกน</TextLink>
+        </Typography>
       </Box>
     </Box>
   );

@@ -10,11 +10,26 @@ import SearchIcon from "@mui/icons-material/Search";
 import StatusBadge from "@/components/StatusBadge";
 import useDeviceSearch from "@/components/useDeviceSearch";
 import ScanButton from "@/components/ScanButton";
+import ScanResult from "@/components/ScanResult";
+import findScanned from "@/components/findScanned";
 import { fontMono } from "@/lib/fonts";
 
 export default function SearchHome({ stats, initialQuery = "" }) {
   const [q, setQ] = useState(initialQuery);
+  const [scan, setScan] = useState(null); // answer for the last scan, until the box is edited
   const { text, results, loading } = useDeviceSearch(q);
+
+  const onScan = async (value, label) => {
+    const scanned = { serial: label?.serial || value, mac: label?.mac || "" };
+    try {
+      const { devices, by } = await findScanned(value, label);
+      setScan({ label: scanned, devices, by });
+      setQ(devices[0]?.serial || scanned.serial || scanned.mac);
+    } catch {
+      setScan(null);
+      setQ(scanned.serial || scanned.mac);
+    }
+  };
   return (
     <Box sx={{ display: "flex", flexDirection: "column", gap: 2.5 }}>
       <Box>
@@ -44,16 +59,21 @@ export default function SearchHome({ stats, initialQuery = "" }) {
           autoFocus
           fullWidth
           value={q}
-          onChange={(e) => setQ(e.target.value)}
-          placeholder="เช่น FX4417 หรือ 240F9B"
+          onChange={(e) => {
+            setQ(e.target.value);
+            setScan(null);
+          }}
+          placeholder="พิมพ์ หรือกดสแกน ▸"
           slotProps={{ input: { "aria-label": "ค้นหา serial, MAC หรือรุ่น" } }}
           sx={{ minHeight: 56, fontSize: 17, fontFamily: fontMono }}
         />
-        <ScanButton onScan={setQ} />
+        <ScanButton onScan={onScan} label="สแกน QR / barcode เพื่อเช็คว่าอยู่ในระบบไหม" />
         {loading && <LinearProgress sx={{ position: "absolute", left: 0, right: 0, bottom: 0, height: 2 }} />}
       </Box>
 
-      {results && (
+      {scan && <ScanResult scan={scan} />}
+
+      {results && !scan && (
         <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
           <Typography sx={{ fontSize: 13, color: "text.secondary" }}>
             {results.length === 0
