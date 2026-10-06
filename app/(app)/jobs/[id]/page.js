@@ -64,7 +64,7 @@ export default async function JobPage({ params }) {
                 { name: "note", label: "หมายเหตุ", type: "multiline" },
               ]}
             />
-            <WarrantyDialog jobId={job.id} deliveredOn={job.delivered_on} deviceCount={job.device_count} />
+            <WarrantyDialog jobId={job.id} deliveredOn={job.delivered_on} devices={job.devices.map(({ id, brand, model, warranty_until, warranty_lifetime }) => ({ id, brand, model, warranty_until, warranty_lifetime }))} />
             <Button variant="outlined" href={`/api/jobs/${job.id}/export`} startIcon={<FileDownloadOutlined />}>
               Export Excel
             </Button>

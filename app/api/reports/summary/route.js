@@ -33,7 +33,7 @@ export const GET = handler(async () => {
       ["สถานที่", "งาน", "วันส่งงาน", "ปีส่งงาน (พ.ศ.)", "ประเภท", "ยี่ห้อ", "กลุ่มยี่ห้อ", "รุ่น", "Serial", "MAC", "ชื่ออุปกรณ์", "IP", "ตำแหน่ง", "ประกันถึง", "สถานะ"],
       devices.map((d) => [
         d.site_name ?? "ไม่สังกัดงาน", d.job_name, d.job_delivered_on, d.job_delivered_on ? Number(d.job_delivered_on.slice(0, 4)) + 543 : null,
-        d.device_type, d.brand, brandGroup(d.brand), d.model, d.serial, d.mac, d.device_name, d.ip, d.location, d.warranty_until, STATUS[d.status]?.label,
+        d.device_type, d.brand, brandGroup(d.brand), d.model, d.serial, d.mac, d.device_name, d.ip, d.location, d.warranty_lifetime ? "Lifetime" : d.warranty_until, STATUS[d.status]?.label,
       ]),
       [34, 34, 12, 14, 16, 14, 16, 22, 20, 18, 24, 14, 24, 12, 12]
     ),

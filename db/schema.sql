@@ -55,6 +55,7 @@ CREATE TABLE IF NOT EXISTS devices (
 -- Columns added after the first release (CREATE TABLE IF NOT EXISTS skips existing tables)
 ALTER TABLE devices ADD COLUMN IF NOT EXISTS note TEXT;
 ALTER TABLE devices ADD COLUMN IF NOT EXISTS warranty_until DATE;  -- optional
+ALTER TABLE devices ADD COLUMN IF NOT EXISTS warranty_lifetime BOOLEAN NOT NULL DEFAULT false;  -- true = no end date (warranty_until stays NULL)
 
 CREATE INDEX IF NOT EXISTS devices_job_id_idx ON devices (job_id);
 -- Serial/MAC are not unique (old data has duplicates); indexed for search

@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
@@ -10,27 +10,47 @@ import DialogActions from "@mui/material/DialogActions";
 import DialogContent from "@mui/material/DialogContent";
 import DialogTitle from "@mui/material/DialogTitle";
 import FormControlLabel from "@mui/material/FormControlLabel";
+import MenuItem from "@mui/material/MenuItem";
 import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
 import VerifiedUserOutlined from "@mui/icons-material/VerifiedUserOutlined";
 import { useToast } from "@/components/Toast";
 
-// delivered + N years, as YYYY-MM-DD (Feb 29 rolls to Mar 1, which is fine for a warranty)
-function addYears(date, years) {
-  const d = new Date(`${date}T00:00:00Z`);
-  d.setUTCFullYear(d.getUTCFullYear() + years);
-  return d.toISOString().slice(0, 10);
-}
+const TERMS = [
+  { value: "", label: "ไม่เปลี่ยน" },
+  { value: "1", label: "1 ปี" },
+  { value: "2", label: "2 ปี" },
+  { value: "3", label: "3 ปี" },
+  { value: "5", label: "5 ปี" },
+  { value: "life", label: "Lifetime" },
+];
 
-// Sets the warranty end date on every device installed in the job
-export default function WarrantyDialog({ jobId, deliveredOn, deviceCount }) {
+// Sets warranty for the job's devices, one brand + model at a time.
+// `devices`: the job's own devices (not the ones it only lists), each { id, brand, model, warranty_until, warranty_lifetime }.
+export default function WarrantyDialog({ jobId, deliveredOn, devices }) {
   const router = useRouter();
   const toast = useToast();
   const [open, setOpen] = useState(false);
-  const [until, setUntil] = useState("");
+  const [start, setStart] = useState(deliveredOn ?? "");
   const [onlyEmpty, setOnlyEmpty] = useState(true);
+  const [terms, setTerms] = useState({}); // group key -> "" | "1".."5" | "life"
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+
+  const groups = useMemo(() => {
+    const map = new Map();
+    for (const d of devices) {
+      const key = `${d.brand ?? ""}\u0000${d.model ?? ""}`;
+      const g = map.get(key) ?? { key, label: [d.brand, d.model].filter(Boolean).join(" ") || "ไม่ระบุรุ่น", ids: [], have: 0 };
+      g.ids.push(d.id);
+      if (d.warranty_until || d.warranty_lifetime) g.have += 1;
+      map.set(key, g);
+    }
+    return [...map.values()].sort((a, b) => a.label.localeCompare(b.label));
+  }, [devices]);
+
+  const chosen = groups.filter((g) => terms[g.key]);
+  const needsStart = chosen.some((g) => terms[g.key] !== "life");
 
   const save = async (e) => {
     e.preventDefault();
@@ -40,7 +60,11 @@ export default function WarrantyDialog({ jobId, deliveredOn, deviceCount }) {
       const res = await fetch(`/api/jobs/${jobId}/warranty`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ warranty_until: until, only_empty: onlyEmpty }),
+        body: JSON.stringify({
+          start,
+          only_empty: onlyEmpty,
+          groups: chosen.map((g) => (terms[g.key] === "life" ? { ids: g.ids, lifetime: true } : { ids: g.ids, years: Number(terms[g.key]) })),
+        }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
@@ -56,43 +80,61 @@ export default function WarrantyDialog({ jobId, deliveredOn, deviceCount }) {
 
   return (
     <>
-      <Button variant="outlined" startIcon={<VerifiedUserOutlined />} onClick={() => { setUntil(""); setError(""); setOpen(true); }}>
-        ตั้งประกันทั้งงาน
+      <Button
+        variant="outlined"
+        startIcon={<VerifiedUserOutlined />}
+        onClick={() => {
+          setStart(deliveredOn ?? "");
+          setTerms({});
+          setError("");
+          setOpen(true);
+        }}
+      >
+        ตั้งประกัน
       </Button>
-      <Dialog open={open} onClose={() => !saving && setOpen(false)} fullWidth maxWidth="xs">
+      <Dialog open={open} onClose={() => !saving && setOpen(false)} fullWidth maxWidth="sm">
         <Box component="form" onSubmit={save}>
-          <DialogTitle sx={{ fontWeight: 600 }}>ตั้งวันหมดประกันทั้งงาน</DialogTitle>
+          <DialogTitle sx={{ fontWeight: 600 }}>ตั้งประกันตามรุ่น</DialogTitle>
           <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, pt: "8px !important" }}>
-            <Typography sx={{ fontSize: 13, color: "text.secondary" }}>ใช้กับอุปกรณ์ที่ติดตั้งในงานนี้ {deviceCount} ตัว</Typography>
             {error && <Alert severity="error">{error}</Alert>}
-            {deliveredOn && (
-              <Box sx={{ display: "flex", gap: 1, alignItems: "center", flexWrap: "wrap" }}>
-                <Typography sx={{ fontSize: 13, color: "text.secondary" }}>นับจากวันส่งงาน:</Typography>
-                {[1, 2, 3, 5].map((y) => (
-                  <Button key={y} size="small" variant="outlined" onClick={() => setUntil(addYears(deliveredOn, y))} sx={{ minHeight: 30 }}>
-                    + {y} ปี
-                  </Button>
-                ))}
-              </Box>
-            )}
             <TextField
-              label="ประกันถึงวันที่"
+              label="วันเริ่มประกัน"
               type="date"
-              required
-              value={until}
-              onChange={(e) => setUntil(e.target.value)}
+              value={start}
+              onChange={(e) => setStart(e.target.value)}
+              helperText={deliveredOn && start === deliveredOn ? "ใช้วันส่งงาน · แก้ได้" : "ประกันหมด = วันเริ่ม + จำนวนปี"}
               slotProps={{ inputLabel: { shrink: true } }}
             />
+            <Typography sx={{ fontSize: 13, color: "text.secondary" }}>
+              เลือกประกันของแต่ละรุ่นตามใบเสนอราคา · รุ่นที่เลือก “ไม่เปลี่ยน” จะไม่ถูกแตะ
+            </Typography>
+            {groups.map((g) => (
+              <Box key={g.key} sx={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) 140px", gap: 1.5, alignItems: "center" }}>
+                <Box sx={{ minWidth: 0 }}>
+                  <Typography sx={{ fontWeight: 500, overflowWrap: "anywhere" }}>{g.label}</Typography>
+                  <Typography sx={{ fontSize: 12, color: "text.secondary" }}>
+                    {g.ids.length} ตัว{g.have > 0 ? ` · มีประกันแล้ว ${g.have}` : ""}
+                  </Typography>
+                </Box>
+                <TextField select size="small" value={terms[g.key] ?? ""} slotProps={{ select: { displayEmpty: true } }} onChange={(e) => setTerms((p) => ({ ...p, [g.key]: e.target.value }))}>
+                  {TERMS.map((t) => (
+                    <MenuItem key={t.value} value={t.value}>
+                      {t.label}
+                    </MenuItem>
+                  ))}
+                </TextField>
+              </Box>
+            ))}
             <FormControlLabel
               control={<Checkbox checked={onlyEmpty} onChange={(e) => setOnlyEmpty(e.target.checked)} />}
-              label="ใส่เฉพาะตัวที่ยังว่าง (ไม่ทับวันที่ที่ใส่ไว้แล้ว)"
+              label="ข้ามตัวที่มีประกันอยู่แล้ว (ไม่ทับ)"
             />
           </DialogContent>
           <DialogActions sx={{ px: 3, pb: 2.5 }}>
             <Button variant="outlined" onClick={() => setOpen(false)} disabled={saving}>
               ยกเลิก
             </Button>
-            <Button type="submit" variant="contained" disabled={saving || !until}>
+            <Button type="submit" variant="contained" disabled={saving || chosen.length === 0 || (needsStart && !start)}>
               {saving ? "กำลังบันทึก…" : "บันทึก"}
             </Button>
           </DialogActions>

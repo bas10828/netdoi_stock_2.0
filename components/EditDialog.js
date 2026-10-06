@@ -5,10 +5,12 @@ import { useTheme } from "@mui/material/styles";
 import useMediaQuery from "@mui/material/useMediaQuery";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
+import Checkbox from "@mui/material/Checkbox";
 import Dialog from "@mui/material/Dialog";
 import DialogActions from "@mui/material/DialogActions";
 import DialogContent from "@mui/material/DialogContent";
 import DialogTitle from "@mui/material/DialogTitle";
+import FormControlLabel from "@mui/material/FormControlLabel";
 import TextField from "@mui/material/TextField";
 import Alert from "@mui/material/Alert";
 import EditOutlined from "@mui/icons-material/EditOutlined";
@@ -21,7 +23,7 @@ export const oneLine = (value) => value.replace(/\s*\n\s*/g, " ");
 const blockEnter = (e) => e.key === "Enter" && e.preventDefault();
 
 // Button + dialog that PATCHes `url` with the edited fields, then refreshes the page.
-// fields: [{ name, label, type?: "text"|"long"|"date"|"mono"|"multiline", required?, half? }]
+// fields: [{ name, label, type?: "text"|"long"|"date"|"mono"|"multiline"|"check", required?, half? }]
 export default function EditDialog({ title, url, fields, values, buttonLabel = "แก้ไข" }) {
   const router = useRouter();
   const toast = useToast();
@@ -69,7 +71,17 @@ export default function EditDialog({ title, url, fields, values, buttonLabel = "
           <DialogTitle sx={{ fontWeight: 600 }}>{title}</DialogTitle>
           <DialogContent sx={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 2, pt: "8px !important" }}>
             {error && <Alert severity="error" sx={{ gridColumn: "1 / -1" }}>{error}</Alert>}
-            {fields.map((f) => (
+            {fields.map((f) =>
+              f.type === "check" ? (
+                <FormControlLabel
+                  key={f.name}
+                  label={f.label}
+                  sx={{ gridColumn: "1 / -1" }}
+                  control={
+                    <Checkbox checked={Boolean(form[f.name])} onChange={(e) => setForm((prev) => ({ ...prev, [f.name]: e.target.checked }))} />
+                  }
+                />
+              ) : (
               <TextField
                 key={f.name}
                 label={f.label}
@@ -90,7 +102,8 @@ export default function EditDialog({ title, url, fields, values, buttonLabel = "
                   htmlInput: f.type === "mono" ? { style: { fontFamily: fontMono } } : undefined,
                 }}
               />
-            ))}
+              )
+            )}
           </DialogContent>
           <DialogActions sx={{ px: 3, pb: 2.5 }}>
             <Button onClick={() => setOpen(false)} disabled={saving} variant="outlined">

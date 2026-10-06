@@ -1,5 +1,5 @@
 import Box from "@mui/material/Box";
-import { STATUS } from "@/lib/format";
+import { STATUS, warrantyLeft } from "@/lib/format";
 
 // Small pill with a dot. color: a palette key (success, warning, error, neutral, primary)
 export function Pill({ color = "neutral", children, sx }) {
@@ -26,6 +26,16 @@ export function Pill({ color = "neutral", children, sx }) {
       {children}
     </Box>
   );
+}
+
+// Remaining warranty as a pill; nothing when no warranty is recorded
+export function WarrantyPill({ until, lifetime, sx }) {
+  const w = warrantyLeft(until, lifetime);
+  return w ? (
+    <Pill color={w.color} sx={sx}>
+      {w.text}
+    </Pill>
+  ) : null;
 }
 
 export default function StatusBadge({ status, sx }) {

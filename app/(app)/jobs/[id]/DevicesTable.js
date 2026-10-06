@@ -17,8 +17,8 @@ import ToggleButtonGroup from "@mui/material/ToggleButtonGroup";
 import Typography from "@mui/material/Typography";
 import InputAdornment from "@mui/material/InputAdornment";
 import FilterListIcon from "@mui/icons-material/FilterList";
-import StatusBadge, { Pill } from "@/components/StatusBadge";
-import { STATUS, searchKey } from "@/lib/format";
+import StatusBadge, { Pill, WarrantyPill } from "@/components/StatusBadge";
+import { STATUS, formatDate, searchKey } from "@/lib/format";
 import { fontMono } from "@/lib/fonts";
 import RemoveRefButton from "./RemoveRefButton";
 
@@ -140,6 +140,7 @@ export default function DevicesTable({ devices: own, refs = [], jobId }) {
               {[d.device_type, d.device_name, d.location].filter(Boolean).join(" · ")}
             </Typography>
             {d.note && <Typography sx={{ ...noteSx, mt: 0.25 }}>{d.note}</Typography>}
+            <WarrantyPill until={d.warranty_until} lifetime={d.warranty_lifetime} sx={{ alignSelf: "flex-start" }} />
             {d.isRef ? (
               <RefNote d={d} />
             ) : (
@@ -154,7 +155,7 @@ export default function DevicesTable({ devices: own, refs = [], jobId }) {
 
       <Card sx={{ display: { xs: shown.length > 25 ? "block" : "none", sm: "block" }, "& .MuiTableContainer-root": { display: { xs: "none", sm: "block" } } }}>
         <TableContainer>
-          <Table sx={{ minWidth: 1000 }}>
+          <Table sx={{ minWidth: 1120 }}>
             <TableHead>
               <TableRow>
                 <TableCell>อุปกรณ์</TableCell>
@@ -162,6 +163,7 @@ export default function DevicesTable({ devices: own, refs = [], jobId }) {
                 <TableCell>MAC</TableCell>
                 <TableCell>ตำแหน่ง</TableCell>
                 <TableCell>หมายเหตุ</TableCell>
+                <TableCell>ประกัน</TableCell>
                 <TableCell>สถานะ</TableCell>
               </TableRow>
             </TableHead>
@@ -195,6 +197,16 @@ export default function DevicesTable({ devices: own, refs = [], jobId }) {
                     {d.note ? <Typography sx={noteSx}>{d.note}</Typography> : <Typography sx={{ color: "text.secondary" }}>—</Typography>}
                   </TableCell>
                   <TableCell>
+                    {d.warranty_until || d.warranty_lifetime ? (
+                      <>
+                        <WarrantyPill until={d.warranty_until} lifetime={d.warranty_lifetime} />
+                        {d.warranty_until && <Typography sx={{ fontSize: 12, color: "text.secondary", mt: 0.25 }}>ถึง {formatDate(d.warranty_until)}</Typography>}
+                      </>
+                    ) : (
+                      <Typography sx={{ color: "text.secondary" }}>—</Typography>
+                    )}
+                  </TableCell>
+                  <TableCell>
                     <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
                       <StatusBadge status={d.status} />
                       {d.isRef && jobId && <RemoveRefButton jobId={jobId} deviceId={d.id} serial={d.serial} />}
@@ -204,7 +216,7 @@ export default function DevicesTable({ devices: own, refs = [], jobId }) {
               ))}
               {pageRows.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={6} sx={{ textAlign: "center", color: "text.secondary", py: 5 }}>
+                  <TableCell colSpan={7} sx={{ textAlign: "center", color: "text.secondary", py: 5 }}>
                     ไม่พบอุปกรณ์ที่ตรงกับตัวกรอง
                   </TableCell>
                 </TableRow>
