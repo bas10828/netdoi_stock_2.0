@@ -96,6 +96,26 @@ export default async function DashboardPage() {
           />
         </Panel>
 
+        <Panel
+          title="มูลค่าตามใบเสนอราคา"
+          subtitle={`ก่อน VAT · มีใบ ${d.quoted.jobs} จาก ${kpi.jobs} งาน · รวม ${fmt(Math.round(d.quoted.total))} บาท · เป็นยอดตามเอกสาร ไม่ใช่ยอดขายจริง`}
+        >
+          {d.quoted.jobs === 0 ? (
+            <Typography sx={{ fontSize: 13, color: "text.secondary", py: 1 }}>ยังไม่มีใบเสนอราคาในระบบ · กด “แนบใบเสนอราคา” ในหน้างาน</Typography>
+          ) : (
+            <>
+              <ColumnChart
+                unit="บาท"
+                items={d.quoted.byYear.map((y) => ({ label: `${y.year + 543}`, value: Math.round(y.total), sub: `${y.jobs} งาน` }))}
+              />
+              <BarList
+                unit="บาท"
+                items={d.quoted.topSites.map((s) => ({ label: s.name, value: Math.round(s.total), text: fmt(Math.round(s.total)), sub: `${s.jobs} งาน` }))}
+              />
+            </>
+          )}
+        </Panel>
+
         <Panel title="ส่วนแบ่งยี่ห้อ" subtitle="จำนวนอุปกรณ์ที่ติดตั้ง รวมยี่ห้อย่อยของผู้ผลิตเดียวกัน (Reyee+Ruijie, UniFi+Ubiquiti)">
           <BarList
             unit="ตัว"

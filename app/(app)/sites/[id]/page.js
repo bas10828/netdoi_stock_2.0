@@ -57,6 +57,7 @@ export default async function SitePage({ params }) {
             po_number: j.po_number,
             note: j.note,
             device_count: j.device_count,
+            quoted_total: j.quoted_total,
             open_claims: j.open_claims,
           }))}
         />

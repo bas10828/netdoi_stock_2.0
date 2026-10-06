@@ -64,6 +64,7 @@ export default function SitesGrid({ sites }) {
             <Typography sx={{ fontWeight: 600, fontSize: 15 }}>{s.name}</Typography>
             <Typography sx={{ fontSize: 13, color: "text.secondary" }}>
               {s.job_count} งาน · {s.device_count.toLocaleString("th-TH")} อุปกรณ์
+              {s.quoted_total !== null && s.quoted_total !== undefined ? ` · ตามใบ ${Math.round(s.quoted_total).toLocaleString("th-TH")} บาท` : ""}
             </Typography>
             <Box sx={{ display: "flex", alignItems: "center", gap: 1, mt: 1 }}>
               <Typography sx={{ fontSize: 12, color: "text.secondary" }}>ส่งงานล่าสุด {s.last_text}</Typography>

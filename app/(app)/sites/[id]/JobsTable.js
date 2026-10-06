@@ -22,6 +22,7 @@ const COLUMNS = [
   { key: "name", label: "งาน" },
   { key: "delivered_on", label: "วันส่งงาน" },
   { key: "device_count", label: "อุปกรณ์", align: "right" },
+  { key: "quoted_total", label: "ยอดตามใบ (บาท)", align: "right" },
   { key: "open_claims", label: "สถานะ" },
 ];
 
@@ -30,6 +31,7 @@ const sortValue = {
   name: (j) => j.name.toLowerCase(),
   delivered_on: (j) => j.delivered_on ?? null,
   device_count: (j) => j.device_count,
+  quoted_total: (j) => j.quoted_total ?? null,
   open_claims: (j) => j.open_claims,
 };
 
@@ -42,6 +44,8 @@ function compare(a, b, key, dir) {
   const c = typeof va === "string" ? va.localeCompare(vb, "th") : va - vb;
   return dir === "asc" ? c : -c;
 }
+
+const baht = (n) => n.toLocaleString("th-TH", { maximumFractionDigits: 0 });
 
 function Status({ job }) {
   return job.open_claims > 0 ? <Pill color="warning">กำลังเคลม {job.open_claims}</Pill> : <Pill color="success">ปกติ</Pill>;
@@ -119,7 +123,7 @@ export default function JobsTable({ jobs }) {
               <Status job={j} />
             </Box>
             <Typography sx={{ fontSize: 13, color: "text.secondary" }}>
-              ส่งงาน {j.date_text} · {j.device_count} อุปกรณ์{j.po_number ? ` · PO ${j.po_number}` : ""}
+              ส่งงาน {j.date_text} · {j.device_count} อุปกรณ์{j.po_number ? ` · PO ${j.po_number}` : ""}{j.quoted_total !== null ? ` · ตามใบ ${baht(j.quoted_total)} บาท` : ""}
             </Typography>
           </Card>
         ))}
@@ -158,6 +162,9 @@ export default function JobsTable({ jobs }) {
                   </TableCell>
                   <TableCell sx={{ color: "text.secondary", whiteSpace: "nowrap" }}>{j.date_text}</TableCell>
                   <TableCell align="right" sx={{ fontVariantNumeric: "tabular-nums" }}>{j.device_count}</TableCell>
+                  <TableCell align="right" sx={{ fontVariantNumeric: "tabular-nums", color: j.quoted_total === null ? "text.secondary" : "text.primary" }}>
+                    {j.quoted_total === null ? "—" : baht(j.quoted_total)}
+                  </TableCell>
                   <TableCell>
                     <Status job={j} />
                   </TableCell>
