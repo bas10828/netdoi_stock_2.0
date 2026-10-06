@@ -126,6 +126,33 @@ CREATE INDEX IF NOT EXISTS job_device_refs_device_id_idx ON job_device_refs (dev
 --   replaced = a claim returned a new unit in its place
 --   ok       = otherwise
 -- Dropped and recreated so new device columns are picked up.
+-- Quotations / estimates attached to a job. Prices are optional (many estimates have none).
+-- Figures are what was quoted, not necessarily what was installed or invoiced.
+CREATE TABLE IF NOT EXISTS quotes (
+  id          SERIAL PRIMARY KEY,
+  job_id      INTEGER NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
+  doc_no      TEXT,           -- e.g. QT202609040001
+  doc_date    DATE,
+  kind        TEXT,           -- ใบเสนอราคา / ประมาณการ / ประมาณการต้นทุน
+  customer    TEXT,           -- addressee on the document (often NT, not the site)
+  source_file TEXT NOT NULL,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (job_id, source_file)
+);
+CREATE TABLE IF NOT EXISTS quote_items (
+  id         SERIAL PRIMARY KEY,
+  quote_id   INTEGER NOT NULL REFERENCES quotes(id) ON DELETE CASCADE,
+  line_no    INTEGER NOT NULL,
+  section    TEXT,            -- building / room heading above the line
+  description TEXT NOT NULL,
+  qty        NUMERIC,
+  unit       TEXT,
+  unit_price NUMERIC,
+  amount     NUMERIC,
+  note       TEXT
+);
+CREATE INDEX IF NOT EXISTS quote_items_quote_id_idx ON quote_items (quote_id);
+
 DROP VIEW IF EXISTS device_overview;
 CREATE VIEW device_overview AS
 SELECT

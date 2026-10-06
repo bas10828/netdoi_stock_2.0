@@ -4,7 +4,7 @@ import Button from "@mui/material/Button";
 import Card from "@mui/material/Card";
 import Typography from "@mui/material/Typography";
 import FileDownloadOutlined from "@mui/icons-material/FileDownloadOutlined";
-import { getJob, getMovedOut } from "@/lib/queries";
+import { getJob, getJobQuotes, getMovedOut } from "@/lib/queries";
 import { formatDate, toId } from "@/lib/format";
 import PageHeader from "@/components/PageHeader";
 import EditDialog from "@/components/EditDialog";
@@ -12,6 +12,7 @@ import { TextLink } from "@/components/Links";
 import { fontMono } from "@/lib/fonts";
 import DevicesTable from "./DevicesTable";
 import WarrantyDialog from "./WarrantyDialog";
+import QuotesPanel from "./QuotesPanel";
 
 export async function generateMetadata({ params }) {
   const id = toId((await params).id);
@@ -23,7 +24,7 @@ export default async function JobPage({ params }) {
   const id = toId((await params).id);
   const job = id && (await getJob(id));
   if (!job) notFound();
-  const movedOut = await getMovedOut(job.id);
+  const [movedOut, quotes] = await Promise.all([getMovedOut(job.id), getJobQuotes(job.id)]);
 
   const subtitle = [
     `ส่งงาน ${formatDate(job.delivered_on)}`,
@@ -72,6 +73,7 @@ export default async function JobPage({ params }) {
         }
       />
       <DevicesTable devices={job.devices} refs={job.refs} jobId={job.id} />
+      <QuotesPanel quotes={quotes} />
 
       {movedOut.length > 0 && (
         <Box component="section" sx={{ mt: 4 }}>
