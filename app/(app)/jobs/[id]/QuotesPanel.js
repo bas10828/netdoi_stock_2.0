@@ -2,6 +2,7 @@ import Box from "@mui/material/Box";
 import Card from "@mui/material/Card";
 import Typography from "@mui/material/Typography";
 import { formatDate } from "@/lib/format";
+import DeleteQuoteButton from "./DeleteQuoteButton";
 
 const baht = new Intl.NumberFormat("th-TH", { maximumFractionDigits: 2 });
 const money = (n) => (n === null || n === undefined ? "—" : baht.format(n));
@@ -34,6 +35,7 @@ export default function QuotesPanel({ quotes }) {
                   {" "}ก่อน VAT · {priced}/{q.items.length} บรรทัดมีราคา
                 </Typography>
               </Typography>
+              <DeleteQuoteButton quoteId={q.id} />
             </Box>
             <Box sx={{ display: { xs: "none", md: "grid" }, gridTemplateColumns: COLS, gap: 2, px: 2, py: 1, color: "text.secondary", fontSize: 12.5 }}>
               <span>รายการ</span>

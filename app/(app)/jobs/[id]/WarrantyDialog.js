@@ -15,15 +15,7 @@ import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
 import VerifiedUserOutlined from "@mui/icons-material/VerifiedUserOutlined";
 import { useToast } from "@/components/Toast";
-
-const TERMS = [
-  { value: "", label: "ไม่เปลี่ยน" },
-  { value: "1", label: "1 ปี" },
-  { value: "2", label: "2 ปี" },
-  { value: "3", label: "3 ปี" },
-  { value: "5", label: "5 ปี" },
-  { value: "life", label: "Lifetime" },
-];
+import { TERMS, needsStartDate, termToGroup } from "@/lib/warrantyTerms";
 
 // Sets warranty for the job's devices, one brand + model at a time.
 // `devices`: the job's own devices (not the ones it only lists), each { id, brand, model, warranty_until, warranty_lifetime }.
@@ -50,7 +42,7 @@ export default function WarrantyDialog({ jobId, deliveredOn, devices }) {
   }, [devices]);
 
   const chosen = groups.filter((g) => terms[g.key]);
-  const needsStart = chosen.some((g) => terms[g.key] !== "life");
+  const needsStart = needsStartDate(chosen.map((g) => terms[g.key]));
 
   const save = async (e) => {
     e.preventDefault();
@@ -63,7 +55,7 @@ export default function WarrantyDialog({ jobId, deliveredOn, devices }) {
         body: JSON.stringify({
           start,
           only_empty: onlyEmpty,
-          groups: chosen.map((g) => (terms[g.key] === "life" ? { ids: g.ids, lifetime: true } : { ids: g.ids, years: Number(terms[g.key]) })),
+          groups: chosen.map((g) => termToGroup(terms[g.key], g.ids)),
         }),
       });
       const data = await res.json();

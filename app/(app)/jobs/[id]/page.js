@@ -13,6 +13,7 @@ import { fontMono } from "@/lib/fonts";
 import DevicesTable from "./DevicesTable";
 import WarrantyDialog from "./WarrantyDialog";
 import QuotesPanel from "./QuotesPanel";
+import QuoteUploadDialog from "./QuoteUploadDialog";
 
 export async function generateMetadata({ params }) {
   const id = toId((await params).id);
@@ -65,6 +66,7 @@ export default async function JobPage({ params }) {
                 { name: "note", label: "หมายเหตุ", type: "multiline" },
               ]}
             />
+            <QuoteUploadDialog jobId={job.id} deliveredOn={job.delivered_on} />
             <WarrantyDialog jobId={job.id} deliveredOn={job.delivered_on} devices={job.devices.map(({ id, brand, model, warranty_until, warranty_lifetime }) => ({ id, brand, model, warranty_until, warranty_lifetime }))} />
             <Button variant="outlined" href={`/api/jobs/${job.id}/export`} startIcon={<FileDownloadOutlined />}>
               Export Excel
