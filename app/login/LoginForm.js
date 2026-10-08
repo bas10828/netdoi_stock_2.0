@@ -41,9 +41,9 @@ export default function LoginForm() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
-      // Only follow same-site relative paths
+      // Only follow same-site relative paths ("//x" and "/\x" would leave the site)
       const next = params.get("next");
-      router.replace(next && next.startsWith("/") && !next.startsWith("//") ? next : "/");
+      router.replace(next && /^\/(?![/\\])/.test(next) ? next : "/");
       router.refresh();
     } catch (err) {
       setError(err.message || "เข้าสู่ระบบไม่สำเร็จ");

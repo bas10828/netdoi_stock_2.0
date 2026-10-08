@@ -15,6 +15,19 @@ CREATE TABLE IF NOT EXISTS users (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+-- Login sessions. The cookie holds a random token; only its SHA-256 is stored,
+-- so a copy of this table can't be used to log in. Deleting a row logs that device out.
+CREATE TABLE IF NOT EXISTS sessions (
+  token_hash   TEXT PRIMARY KEY,
+  user_id      INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+  last_seen_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  expires_at   TIMESTAMPTZ NOT NULL,   -- slides forward with use, never past created_at + max age
+  ip           TEXT,
+  user_agent   TEXT
+);
+CREATE INDEX IF NOT EXISTS sessions_user_id_idx ON sessions (user_id);
+
 -- A place we install equipment at (hospital, school, municipality, ...)
 CREATE TABLE IF NOT EXISTS sites (
   id         SERIAL PRIMARY KEY,

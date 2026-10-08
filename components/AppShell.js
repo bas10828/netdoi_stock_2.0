@@ -18,6 +18,7 @@ import BuildCircleOutlined from "@mui/icons-material/BuildCircleOutlined";
 import DashboardOutlined from "@mui/icons-material/DashboardOutlined";
 import MenuIcon from "@mui/icons-material/Menu";
 import LogoutOutlined from "@mui/icons-material/LogoutOutlined";
+import DevicesOutlined from "@mui/icons-material/DevicesOutlined";
 import CommandPalette, { kbdSx } from "./CommandPalette";
 import ThemeToggle from "./ThemeToggle";
 import ScanButton from "./ScanButton";
@@ -156,9 +157,9 @@ export default function AppShell({ user, openClaims = 0, children }) {
     router.push(`/?q=${encodeURIComponent(code)}`);
   };
 
-  const logout = async () => {
+  const logout = async (everywhere = false) => {
     setUserMenu(null);
-    await fetch("/api/auth/logout", { method: "POST" });
+    await fetch(`/api/auth/logout${everywhere ? "?all=1" : ""}`, { method: "POST" });
     router.replace("/login");
     router.refresh();
   };
@@ -248,11 +249,17 @@ export default function AppShell({ user, openClaims = 0, children }) {
               <Typography sx={{ fontWeight: 600 }}>{user.username}</Typography>
               <Typography sx={{ fontSize: 12, color: "text.secondary" }}>{user.role}</Typography>
             </Box>
-            <MenuItem onClick={logout}>
+            <MenuItem onClick={() => logout()}>
               <ListItemIcon>
                 <LogoutOutlined fontSize="small" />
               </ListItemIcon>
               ออกจากระบบ
+            </MenuItem>
+            <MenuItem onClick={() => logout(true)}>
+              <ListItemIcon>
+                <DevicesOutlined fontSize="small" />
+              </ListItemIcon>
+              ออกจากระบบทุกเครื่อง
             </MenuItem>
           </Menu>
         </Box>

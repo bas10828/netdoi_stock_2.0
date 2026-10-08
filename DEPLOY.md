@@ -28,11 +28,7 @@ nano .env
 ```
 
 - `DATABASE_URL` — คัดลอกบรรทัดเดียวกันจากไฟล์ `.env` ในเครื่องที่ dev (`netdoi_stock_2.0/.env`) มาวางทั้งบรรทัด
-- `JWT_SECRET` — สร้างใหม่สำหรับ server:
-  ```bash
-  openssl rand -base64 48
-  ```
-  (ใช้คนละค่ากับเครื่อง dev ได้ แค่ต้องคงที่ ถ้าเปลี่ยนทุกคนจะถูก logout)
+- `JWT_SECRET` ไม่ต้องใช้แล้ว (session เก็บใน DB) มีค้างอยู่ใน `.env` ก็ไม่เป็นไร
 
 ```bash
 chmod 600 .env
@@ -98,6 +94,7 @@ docker compose down               # หยุด (ข้อมูลอยู่
 
 - **เครื่อง dev กับ server ใช้ DB เดียวกัน (`netdoi_v2`)** — แก้ข้อมูลตอนทดสอบบนเครื่อง dev จะเห็นบน server ทันที ถ้าต้องการแยก ภายหลังสร้าง DB สำหรับ dev แยกได้
 - **cookie login** ตั้งเป็น Secure อัตโนมัติเมื่อเข้าผ่าน https ของ Cloudflare
+- **session login** เก็บในตาราง `sessions`: ไม่ได้ใช้ 30 วันหลุด · login ครั้งหนึ่งอยู่ได้สูงสุด 90 วัน · เมนูผู้ใช้ → "ออกจากระบบทุกเครื่อง" ใช้ตอนเครื่องหาย · ต้องมีตารางนี้ก่อน (รัน migrate) ไม่งั้น login ไม่ได้
 - **หน้า `/phone-setup`** ไม่ต้องใช้บน server (ใบรับรองของ Cloudflare ถูกต้องอยู่แล้ว) ปุ่มดาวน์โหลดในหน้านั้นจะใช้ไม่ได้บน server ซึ่งถูกต้อง
 - **backup**: ข้อมูลทั้งหมดอยู่ใน schema `stock` ของ `netdoi_v2` เช่น
   ```bash
@@ -111,5 +108,5 @@ docker compose down               # หยุด (ข้อมูลอยู่
 | Cloudflare ขึ้น 502 / Bad gateway | `curl -I http://localhost:3100/login` บน server ได้ 200 ไหม · ถ้าได้ แปลว่า URL ใน Public Hostname ผิด หรือ cloudflared ต่อ `192.168.233.200:3100` ไม่ได้ |
 | cloudflared อยู่ใน docker network ต่อ host ไม่ได้ | หา network: `docker inspect cloudflared_tunnel --format '{{json .NetworkSettings.Networks}}'` แล้วเพิ่มใน `docker-compose.yml` ของแอป: `networks: [<ชื่อ>]` + ด้านล่างไฟล์ `networks: { <ชื่อ>: { external: true } }` · ตั้ง Service URL เป็น `http://netdoi_stock_v2:3000` |
 | หน้าเว็บขึ้น "เกิดข้อผิดพลาดที่ server" | `docker compose logs app` · ส่วนใหญ่คือ `DATABASE_URL` ผิด หรือ container ต่อ `192.168.233.200:5432` ไม่ได้ |
-| login แล้วเด้งกลับหน้า login | `JWT_SECRET` ว่าง/ผิด ใน `.env` → แก้แล้ว `docker compose up -d` |
+| login แล้วเด้งกลับหน้า login | ตาราง `sessions` ยังไม่มี → `docker compose exec app node scripts/migrate.mjs` · ดู `docker compose logs app` |
 | build ล้มตอน `npm ci` / ฟอนต์ | server ออกอินเทอร์เน็ตไม่ได้ (cdn.sheetjs.com, fonts.googleapis.com) |
