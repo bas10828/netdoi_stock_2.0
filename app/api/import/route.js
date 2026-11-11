@@ -1,6 +1,6 @@
 import { error, handler, HttpError, json } from "@/lib/api";
 import { transaction } from "@/lib/db";
-import { clean, toId } from "@/lib/format";
+import { clean, hasThai, toId } from "@/lib/format";
 import { LEGACY_JOB_NOTE, recordMoves, snapshotDevices, todayIso } from "@/lib/moves";
 import { canonicalizeField } from "@/lib/catalog";
 
@@ -14,7 +14,9 @@ const MAX_DEVICES = 5000;
 export const POST = handler(async (request, { user }) => {
   const body = await request.json().catch(() => ({}));
   const siteId = body.site_id ? toId(body.site_id) : null;
-  const siteName = clean(body.site_name);
+  const siteNameEn = clean(body.site_name_en);
+  // Without a Thai name the English one is the main name until a Thai one is added
+  const siteName = clean(body.site_name) ?? siteNameEn;
   const jobName = clean(body.job?.name);
   const deliveredOn = clean(body.job?.delivered_on);
   const devices = Array.isArray(body.devices) ? body.devices : [];
@@ -44,15 +46,47 @@ export const POST = handler(async (request, { user }) => {
       [site] = (await db.query(`SELECT id FROM sites WHERE id = $1`, [siteId])).rows;
       if (!site) throw new HttpError("ไม่พบสถานที่ที่เลือก", 404);
     } else {
-      // Same name (ignoring case/spaces) reuses the existing site
-      [site] = (
+      // Same Thai or English name (ignoring case/spaces) reuses the existing site
+      const found = (
         await db.query(
-          `INSERT INTO sites (name) VALUES ($1)
-           ON CONFLICT ((lower(btrim(name)))) DO UPDATE SET name = sites.name
-           RETURNING id`,
-          [siteName]
+          `SELECT id FROM sites
+            WHERE lower(btrim(name)) = lower(btrim($1))
+               OR lower(btrim(name_en)) = lower(btrim($2))
+               OR lower(btrim(name)) = lower(btrim($2))`,
+          [siteName, siteNameEn]
         )
       ).rows;
+      if (found.length > 1) {
+        throw new HttpError("ชื่อไทยกับชื่ออังกฤษตรงกับคนละสถานที่ เลือกสถานที่จากรายการแทน", 409);
+      }
+      [site] = found.length
+        ? found
+        : (
+            await db.query(`INSERT INTO sites (name, name_en) VALUES ($1, $2) RETURNING id`, [siteName, siteNameEn])
+          ).rows;
+    }
+    // A site known only by its English name gets the Thai name typed now
+    const thaiName = clean(body.site_name);
+    if (thaiName && hasThai(thaiName)) {
+      await db.query(
+        // The old (English) name moves to name_en unless that is already set or taken
+        `UPDATE sites SET name = $2,
+                name_en = CASE
+                  WHEN name_en IS NULL AND NOT EXISTS (SELECT 1 FROM sites o WHERE lower(btrim(o.name_en)) = lower(btrim(sites.name)))
+                  THEN name ELSE name_en END
+          WHERE id = $1 AND name !~ '[ก-๙]'
+            AND NOT EXISTS (SELECT 1 FROM sites o WHERE lower(btrim(o.name)) = lower(btrim($2)))`,
+        [site.id, thaiName]
+      );
+    }
+    // Keep the file's English name on a site that has none yet (never overwrite one)
+    if (siteNameEn) {
+      await db.query(
+        `UPDATE sites SET name_en = $2
+          WHERE id = $1 AND name_en IS NULL
+            AND NOT EXISTS (SELECT 1 FROM sites o WHERE lower(btrim(o.name_en)) = lower(btrim($2)))`,
+        [site.id, siteNameEn]
+      );
     }
 
     const [job] = (

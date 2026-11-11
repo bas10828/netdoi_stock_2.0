@@ -4,6 +4,7 @@ import NextLink from "next/link";
 import Box from "@mui/material/Box";
 import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
+import { siteNameEn } from "@/lib/format";
 import InputAdornment from "@mui/material/InputAdornment";
 import FilterListIcon from "@mui/icons-material/FilterList";
 import { Pill } from "@/components/StatusBadge";
@@ -11,7 +12,7 @@ import { Pill } from "@/components/StatusBadge";
 export default function SitesGrid({ sites }) {
   const [filter, setFilter] = useState("");
   const f = filter.trim().toLowerCase();
-  const shown = f ? sites.filter((s) => s.name.toLowerCase().includes(f)) : sites;
+  const shown = f ? sites.filter((s) => s.name.toLowerCase().includes(f) || (s.name_en ?? "").toLowerCase().includes(f)) : sites;
 
   return (
     <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
@@ -62,6 +63,7 @@ export default function SitesGrid({ sites }) {
             }}
           >
             <Typography sx={{ fontWeight: 600, fontSize: 15 }}>{s.name}</Typography>
+            {siteNameEn(s) && <Typography sx={{ fontSize: 13, color: "text.secondary" }}>{siteNameEn(s)}</Typography>}
             <Typography sx={{ fontSize: 13, color: "text.secondary" }}>
               {s.job_count} งาน · {s.device_count.toLocaleString("th-TH")} อุปกรณ์
               {s.quoted_total !== null && s.quoted_total !== undefined ? ` · ตามใบ ${Math.round(s.quoted_total).toLocaleString("th-TH")} บาท` : ""}

@@ -5,6 +5,7 @@ import Box from "@mui/material/Box";
 import Dialog from "@mui/material/Dialog";
 import InputBase from "@mui/material/InputBase";
 import Typography from "@mui/material/Typography";
+import { siteNameEn } from "@/lib/format";
 import CircularProgress from "@mui/material/CircularProgress";
 import SearchIcon from "@mui/icons-material/Search";
 import StatusBadge, { Pill } from "./StatusBadge";
@@ -39,7 +40,7 @@ function PaletteBody({ onClose }) {
   // One keyboard-navigable list: sites, then jobs, then devices
   const results = found
     ? [
-        ...found.sites.map((x) => ({ key: `s${x.id}`, href: `/sites/${x.id}`, kind: "สถานที่", title: x.name, sub: `${x.job_count} งาน · ${x.device_count} อุปกรณ์` })),
+        ...found.sites.map((x) => ({ key: `s${x.id}`, href: `/sites/${x.id}`, kind: "สถานที่", title: x.name, sub: [siteNameEn(x), `${x.job_count} งาน · ${x.device_count} อุปกรณ์`].filter(Boolean).join(" · ") })),
         ...found.jobs.map((j) => ({ key: `j${j.id}`, href: `/jobs/${j.id}`, kind: "งาน", title: j.name, sub: j.site_name })),
         ...found.devices.map((d) => ({
           key: `d${d.id}`,

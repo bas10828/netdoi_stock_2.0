@@ -5,6 +5,7 @@ import Box from "@mui/material/Box";
 import Card from "@mui/material/Card";
 import InputBase from "@mui/material/InputBase";
 import Typography from "@mui/material/Typography";
+import { siteNameEn } from "@/lib/format";
 import LinearProgress from "@mui/material/LinearProgress";
 import SearchIcon from "@mui/icons-material/Search";
 import StatusBadge from "@/components/StatusBadge";
@@ -45,6 +46,7 @@ function PlaceResults({ sites, jobs }) {
                 <Box sx={{ minWidth: 0, flex: 1 }}>
                   <Typography sx={{ fontWeight: 500 }}>{x.name}</Typography>
                   <Typography sx={{ fontSize: 12, color: "text.secondary" }}>
+                    {siteNameEn(x) && `${siteNameEn(x)} · `}
                     {x.job_count} งาน · {x.device_count.toLocaleString("th-TH")} อุปกรณ์
                   </Typography>
                 </Box>

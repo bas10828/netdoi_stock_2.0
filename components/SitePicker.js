@@ -4,6 +4,7 @@ import Autocomplete from "@mui/material/Autocomplete";
 import Box from "@mui/material/Box";
 import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
+import { siteNameEn } from "@/lib/format";
 
 // One request per page load is enough for the site list
 let sitesPromise = null;
@@ -32,9 +33,11 @@ export default function SitePicker({ value, onChange, label = "สถานท�
     };
   }, []);
 
-  const match = sites.find((s) => norm(s.name) === norm(value));
+  // Typed text may be the Thai or the English name
+  const find = (name) => sites.find((s) => norm(s.name) === norm(name)) ?? sites.find((s) => norm(name) && norm(s.name_en) === norm(name));
+  const match = find(value);
   const emit = (name) => {
-    const m = sites.find((s) => norm(s.name) === norm(name));
+    const m = find(name);
     onChange({ site_id: m?.id ?? null, site_name: name });
   };
 
@@ -44,6 +47,10 @@ export default function SitePicker({ value, onChange, label = "สถานท�
         freeSolo
         options={sites}
         getOptionLabel={(o) => (typeof o === "string" ? o : o.name)}
+        filterOptions={(options, { inputValue }) => {
+          const q = norm(inputValue);
+          return q ? options.filter((o) => norm(o.name).includes(q) || norm(o.name_en).includes(q)) : options;
+        }}
         inputValue={value ?? ""}
         onInputChange={(_, v, reason) => {
           if (reason !== "reset" || v) emit(v);
@@ -54,8 +61,15 @@ export default function SitePicker({ value, onChange, label = "สถานท�
           return (
             <li key={key} {...other}>
               <Box sx={{ display: "flex", width: "100%", gap: 1 }}>
-                <span>{o.name}</span>
-                <Typography component="span" sx={{ ml: "auto", fontSize: 12, color: "text.secondary" }}>
+                <Box component="span" sx={{ minWidth: 0 }}>
+                  {o.name}
+                  {siteNameEn(o) && (
+                    <Typography component="span" sx={{ display: "block", fontSize: 12, color: "text.secondary" }}>
+                      {siteNameEn(o)}
+                    </Typography>
+                  )}
+                </Box>
+                <Typography component="span" sx={{ ml: "auto", fontSize: 12, color: "text.secondary", flexShrink: 0 }}>
                   {o.job_count} งาน
                 </Typography>
               </Box>
@@ -66,7 +80,7 @@ export default function SitePicker({ value, onChange, label = "สถานท�
       />
       {value?.trim() ? (
         <Typography sx={{ fontSize: 12, mt: 0.5, color: match ? "success.main" : "text.secondary" }}>
-          {match ? `สถานที่เดิม · ${match.job_count} งาน` : "จะสร้างเป็นสถานที่ใหม่"}
+          {match ? `สถานที่เดิม “${match.name}” · ${match.job_count} งาน` : "จะสร้างเป็นสถานที่ใหม่"}
         </Typography>
       ) : (
         helperText && <Typography sx={{ fontSize: 12, mt: 0.5, color: "text.secondary" }}>{helperText}</Typography>

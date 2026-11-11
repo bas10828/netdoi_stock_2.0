@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import UploadFileOutlined from "@mui/icons-material/UploadFileOutlined";
 import { getSite } from "@/lib/queries";
-import { formatDate, toId } from "@/lib/format";
+import { formatDate, siteNameEn, toId } from "@/lib/format";
 import PageHeader from "@/components/PageHeader";
 import { LinkButton } from "@/components/Links";
 import EditDialog from "@/components/EditDialog";
@@ -26,15 +26,22 @@ export default async function SitePage({ params }) {
       <PageHeader
         crumbs={[{ label: "สถานที่", href: "/sites" }, { label: site.name }]}
         title={site.name}
-        subtitle={`${site.jobs.length} งาน · ${devices.toLocaleString("th-TH")} อุปกรณ์${site.note ? ` · ${site.note}` : ""}`}
+        subtitle={[
+          siteNameEn(site),
+          `${site.jobs.length} งาน · ${devices.toLocaleString("th-TH")} อุปกรณ์`,
+          site.note,
+        ]
+          .filter(Boolean)
+          .join(" · ")}
         actions={
           <>
             <EditDialog
               title="แก้ไขสถานที่"
               url={`/api/sites/${site.id}`}
-              values={{ name: site.name, note: site.note ?? "" }}
+              values={{ name: site.name, name_en: site.name_en ?? "", note: site.note ?? "" }}
               fields={[
-                { name: "name", label: "ชื่อสถานที่", type: "long", required: true },
+                { name: "name", label: "ชื่อไทย", type: "long", required: true },
+                { name: "name_en", label: "ชื่ออังกฤษ", type: "long" },
                 { name: "note", label: "หมายเหตุ", type: "multiline" },
               ]}
             />

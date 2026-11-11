@@ -35,6 +35,7 @@ import { useToast } from "@/components/Toast";
 import { oneLine } from "@/components/EditDialog";
 import { FIELDS, looksLikeExponent, parseInventory } from "@/lib/parseInventory";
 import { fontMono } from "@/lib/fonts";
+import { hasThai, siteNameEn } from "@/lib/format";
 
 const norm = (s) => String(s ?? "").trim().toLowerCase();
 const today = () => {
@@ -189,6 +190,7 @@ export default function ImportForm() {
   const [sites, setSites] = useState([]);
   const [siteInput, setSiteInput] = useState("");
   const [siteId, setSiteId] = useState(null);
+  const [siteEnInput, setSiteEnInput] = useState(""); // English name, e.g. the file's title
   const [jobName, setJobName] = useState("");
   const [deliveredOn, setDeliveredOn] = useState(today);
   const [poNumber, setPoNumber] = useState("");
@@ -217,6 +219,7 @@ export default function ImportForm() {
         if (pre) {
           setSiteId(pre.id);
           setSiteInput(pre.name);
+          setSiteEnInput(pre.name_en ?? "");
         }
       })
       .catch(() => {});
@@ -233,10 +236,17 @@ export default function ImportForm() {
     };
   }, []);
 
-  const matchedSite = useMemo(
-    () => (siteId ? sites.find((s) => s.id === siteId) : sites.find((s) => norm(s.name) === norm(siteInput))),
-    [sites, siteId, siteInput]
-  );
+  // The chosen site, or an existing one with the typed Thai name or English name
+  const matchedSite = useMemo(() => {
+    if (siteId) return sites.find((s) => s.id === siteId);
+    const th = norm(siteInput);
+    const en = norm(siteEnInput);
+    return (
+      (th && sites.find((s) => norm(s.name) === th)) ||
+      (en && sites.find((s) => norm(s.name_en) === en || norm(s.name) === en)) ||
+      undefined
+    );
+  }, [sites, siteId, siteInput, siteEnInput]);
 
   const loadFile = async (file) => {
     if (!file) return;
@@ -254,7 +264,12 @@ export default function ImportForm() {
       setExisting({});
       setPage(0);
       setOnlyIssues(false);
-      if (!siteInput && !siteId && siteName) setSiteInput(siteName);
+      // The file's title may be Thai or English: fill whichever box is still empty
+      if (siteName && !siteId) {
+        if (hasThai(siteName)) {
+          if (!siteInput) setSiteInput(siteName);
+        } else if (!siteEnInput) setSiteEnInput(siteName);
+      }
     } catch (err) {
       setError(err.message || "อ่านไฟล์ไม่สำเร็จ");
     } finally {
@@ -387,7 +402,7 @@ export default function ImportForm() {
   const pageRows = visible.slice(safePage * rowsPerPage, (safePage + 1) * rowsPerPage);
 
   const toSave = rows.length - summary.skip;
-  const canSave = toSave > 0 && jobName.trim() && (siteId || siteInput.trim()) && !saving && !checking;
+  const canSave = toSave > 0 && jobName.trim() && (siteId || siteInput.trim() || siteEnInput.trim()) && !saving && !checking;
 
   const save = async () => {
     setSaving(true);
@@ -399,6 +414,7 @@ export default function ImportForm() {
         body: JSON.stringify({
           site_id: matchedSite?.id ?? null,
           site_name: siteInput,
+          site_name_en: siteEnInput,
           job: { name: jobName, delivered_on: deliveredOn, po_number: poNumber, note },
           devices: rows.flatMap((r) => {
             const match = existing[norm(r.serial)];
@@ -449,6 +465,7 @@ export default function ImportForm() {
                   if (value && typeof value === "object") {
                     setSiteId(value.id);
                     setSiteInput(value.name);
+                    if (value.name_en) setSiteEnInput(value.name_en);
                   }
                 }}
                 renderOption={(props, o) => {
@@ -456,19 +473,50 @@ export default function ImportForm() {
                   return (
                     <li key={key} {...rest}>
                       <Box sx={{ display: "flex", width: "100%", gap: 1 }}>
-                        <span>{o.name}</span>
-                        <Typography component="span" sx={{ ml: "auto", fontSize: 12, color: "text.secondary" }}>
+                        <Box component="span" sx={{ minWidth: 0 }}>
+                          {o.name}
+                          {siteNameEn(o) && (
+                            <Typography component="span" sx={{ display: "block", fontSize: 12, color: "text.secondary" }}>
+                              {siteNameEn(o)}
+                            </Typography>
+                          )}
+                        </Box>
+                        <Typography component="span" sx={{ ml: "auto", fontSize: 12, color: "text.secondary", flexShrink: 0 }}>
                           {o.job_count} งาน
                         </Typography>
                       </Box>
                     </li>
                   );
                 }}
-                renderInput={(p) => <TextField {...p} label="สถานที่" required placeholder="เลือกหรือพิมพ์ชื่อใหม่" />}
+                filterOptions={(options, { inputValue }) => {
+                  const q = norm(inputValue);
+                  return q ? options.filter((o) => norm(o.name).includes(q) || norm(o.name_en).includes(q)) : options;
+                }}
+                renderInput={(p) => <TextField {...p} label="สถานที่ (ชื่อไทย)" placeholder="เลือกหรือพิมพ์ชื่อใหม่" />}
               />
-              {siteInput.trim() && (
+              <TextField
+                label="ชื่ออังกฤษ (ไม่บังคับ)"
+                value={siteEnInput}
+                onChange={(e) => setSiteEnInput(oneLine(e.target.value))}
+                fullWidth
+                size="small"
+                sx={{ mt: 1.5 }}
+                helperText={
+                  matchedSite?.name_en && norm(matchedSite.name_en) !== norm(siteEnInput)
+                    ? `สถานที่นี้มีชื่ออังกฤษ “${matchedSite.name_en}” อยู่แล้ว · แก้ได้ที่หน้าสถานที่`
+                    : undefined
+                }
+              />
+              {(siteInput.trim() || siteEnInput.trim()) && (
                 <Typography sx={{ fontSize: 12, mt: 0.75, color: matchedSite ? "success.main" : "text.secondary" }}>
-                  {matchedSite ? `สถานที่เดิม · มีอยู่ ${matchedSite.job_count} งาน` : "จะสร้างเป็นสถานที่ใหม่"}
+                  {matchedSite
+                    ? `สถานที่เดิม “${matchedSite.name}” · มีอยู่ ${matchedSite.job_count} งาน` +
+                      (!hasThai(matchedSite.name) && hasThai(siteInput) && norm(siteInput) !== norm(matchedSite.name)
+                        ? ` · จะตั้งชื่อไทยเป็น “${siteInput.trim()}”`
+                        : "")
+                    : siteInput.trim()
+                      ? "จะสร้างเป็นสถานที่ใหม่"
+                      : "จะสร้างเป็นสถานที่ใหม่ · ยังไม่มีชื่อไทย เพิ่มทีหลังได้ที่หน้าสถานที่"}
                 </Typography>
               )}
             </Box>

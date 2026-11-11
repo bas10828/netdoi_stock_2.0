@@ -37,6 +37,10 @@ CREATE TABLE IF NOT EXISTS sites (
 );
 -- Same name with different case/spacing is the same site
 CREATE UNIQUE INDEX IF NOT EXISTS sites_name_key ON sites (lower(btrim(name)));
+-- English name, e.g. the title of an Inventory report. "name" holds the Thai name
+-- (or the English one until a Thai name is added later).
+ALTER TABLE sites ADD COLUMN IF NOT EXISTS name_en TEXT;
+CREATE UNIQUE INDEX IF NOT EXISTS sites_name_en_key ON sites (lower(btrim(name_en))) WHERE name_en IS NOT NULL;
 
 -- One delivered job at a site = one Inventory report
 CREATE TABLE IF NOT EXISTS jobs (
